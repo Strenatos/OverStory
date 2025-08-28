@@ -1,0 +1,597 @@
+import tkinter as tk
+import random
+import math
+import time
+
+class BulletHellGame:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("Bullet Hell Game - Enhanced")
+        self.root.configure(bg='black')
+        
+        # Game constants
+        self.GAME_WIDTH = 600
+        self.GAME_HEIGHT = 400
+        self.BATTLE_BOX_WIDTH = 400
+        self.BATTLE_BOX_HEIGHT = 300
+        self.PLAYER_SIZE = 8
+        self.BULLET_SIZE = 4
+        
+        # Calculate battle box position (centered)
+        self.battle_box_x = (self.GAME_WIDTH - self.BATTLE_BOX_WIDTH) // 2
+        self.battle_box_y = (self.GAME_HEIGHT - self.BATTLE_BOX_HEIGHT) // 2
+        
+        # Create canvas
+        self.canvas = tk.Canvas(root, width=self.GAME_WIDTH, height=self.GAME_HEIGHT, bg='black')
+        self.canvas.pack()
+        
+        # Game state
+        self.game_running = False  # Start with game paused for cutscene
+        self.in_cutscene = True
+        self.cutscene_timer = 0
+        self.figure_x = self.GAME_WIDTH // 2
+        self.figure_y = self.GAME_HEIGHT // 2
+        self.figure_target_y = self.battle_box_y - 20  # Position above battle box
+        self.figure_speed = 2
+        self.dialogue_index = 0
+        self.dialogue_timer = 0
+        self.dialogue = [
+            "Who dares to challenge me?",
+            "You think you can survive my attacks?",
+            "Prepare yourself... The battle begins!",
+        ]
+        
+        self.player_x = 110
+        self.player_y = 80
+        self.player_speed = 3
+        self.bullets = []
+        self.score = 0
+        self.hp = 20
+        self.max_hp = 20
+        self.invulnerable = False
+        self.invuln_timer = 0
+        
+        # Enhanced enemy patterns
+        self.pattern_timer = 0
+        self.pattern_type = 0
+        self.pattern_sub_timer = 0
+        self.wave_offset = 0
+        self.spiral_angle = 0
+        self.laser_charge_timer = 0
+        self.targeting_bullets = []
+        
+        # Create UI elements
+        self.create_ui()
+        
+        # Bind keys (add arrow keys)
+        self.keys_pressed = set()
+        root.bind('<KeyPress>', self.key_press)
+        root.bind('<KeyRelease>', self.key_release)
+        root.focus_set()
+        
+        # Start game loop
+        self.game_loop()
+    
+    def create_ui(self):
+        # Draw battle box
+        self.battle_box = self.canvas.create_rectangle(
+            self.battle_box_x, self.battle_box_y,
+            self.battle_box_x + self.BATTLE_BOX_WIDTH,
+            self.battle_box_y + self.BATTLE_BOX_HEIGHT,
+            outline='white', width=3, fill='', tags='ui'
+        )
+        
+        # HP bar background
+        self.canvas.create_rectangle(50, 50, 250, 70, fill='red', tags='ui')
+        
+        # Instructions (updated for arrow keys)
+        self.canvas.create_text(self.GAME_WIDTH//2, 30, text="WASD or Arrow Keys to move • Survive the enhanced bullet patterns!", 
+                               fill='white', font=('Arial', 12), tags='ui')
+    
+    def update_ui(self):
+        # Clear old UI
+        self.canvas.delete('hp_bar')
+        self.canvas.delete('score_text')
+        self.canvas.delete('pattern_text')
+        
+        # HP bar (green portion)
+        hp_width = int(200 * (self.hp / self.max_hp))
+        if hp_width > 0:
+            self.canvas.create_rectangle(50, 50, 50 + hp_width, 70, fill='lime', tags='hp_bar')
+        
+        # HP text
+        self.canvas.create_text(150, 60, text=f"HP: {self.hp}/{self.max_hp}", 
+                               fill='white', font=('Arial', 10), tags='hp_bar')
+        
+        # Score
+        self.canvas.create_text(400, 60, text=f"Score: {self.score}", 
+                               fill='white', font=('Arial', 12), tags='score_text')
+        
+        # Current pattern indicator
+        pattern_names = ["Spiral", "Wall", "Random", "Cross", "Laser", "Homing", "Wave", "Burst", "Ring", "Snake"]
+        self.canvas.create_text(500, 80, text=f"Pattern: {pattern_names[self.pattern_type]}", 
+                               fill='yellow', font=('Arial', 10), tags='pattern_text')
+    
+    def key_press(self, event):
+        self.keys_pressed.add(event.keysym.lower())
+    
+    def key_release(self, event):
+        self.keys_pressed.discard(event.keysym.lower())
+    
+    def move_player(self):
+        dx, dy = 0, 0
+        
+        # Support both WASD and arrow keys
+        if 'w' in self.keys_pressed or 'up' in self.keys_pressed:
+            dy -= self.player_speed
+        if 's' in self.keys_pressed or 'down' in self.keys_pressed:
+            dy += self.player_speed
+        if 'a' in self.keys_pressed or 'left' in self.keys_pressed:
+            dx -= self.player_speed
+        if 'd' in self.keys_pressed or 'right' in self.keys_pressed:
+            dx += self.player_speed
+        
+        # Diagonal movement normalization
+        if dx != 0 and dy != 0:
+            dx *= 0.707  # 1/sqrt(2)
+            dy *= 0.707
+        
+        # Update position with boundary checking
+        new_x = self.player_x + dx
+        new_y = self.player_y + dy
+        
+        # Keep player within battle box
+        if (self.battle_box_x + self.PLAYER_SIZE <= new_x <= 
+            self.battle_box_x + self.BATTLE_BOX_WIDTH - self.PLAYER_SIZE):
+            self.player_x = new_x
+            
+        if (self.battle_box_y + self.PLAYER_SIZE <= new_y <= 
+            self.battle_box_y + self.BATTLE_BOX_HEIGHT - self.PLAYER_SIZE):
+            self.player_y = new_y
+    
+    def handle_cutscene(self):
+        self.cutscene_timer += 1
+        
+        # Display dialogue
+        if self.dialogue_index < len(self.dialogue):
+            self.canvas.delete('dialogue')
+            self.canvas.create_text(
+                self.GAME_WIDTH // 2, self.GAME_HEIGHT - 50,
+                text=self.dialogue[self.dialogue_index],
+                fill='white', font=('Arial', 14), tags='dialogue'
+            )
+            
+            # Advance dialogue every 2 seconds (120 frames at 60fps)
+            if self.cutscene_timer % 120 == 0:
+                self.dialogue_index += 1
+                
+        # Move figure to top after dialogue is complete
+        elif self.dialogue_index >= len(self.dialogue):
+            if self.figure_y > self.figure_target_y:
+                self.figure_y -= self.figure_speed
+            else:
+                # Start battle
+                self.in_cutscene = False
+                self.game_running = True
+                self.canvas.delete('dialogue')
+                self.canvas.delete('figure')
+                self.canvas.itemconfig(self.battle_box, outline='white')  # Show battle box
+    
+    def create_bullet_pattern(self):
+        self.pattern_timer += 1
+        self.pattern_sub_timer += 1
+        
+        # Change pattern every 4 seconds (240 frames at 60fps)
+        if self.pattern_timer % 240 == 0:
+            self.pattern_type = (self.pattern_type + 1) % 10
+            self.pattern_sub_timer = 0
+        
+        # Spawn bullets based on current pattern
+        if self.pattern_type == 0:
+            self.enhanced_spiral_pattern()
+        elif self.pattern_type == 1:
+            self.wall_pattern()
+        elif self.pattern_type == 2:
+            self.random_pattern()
+        elif self.pattern_type == 3:
+            self.cross_pattern()
+        elif self.pattern_type == 4:
+            self.laser_pattern()
+        elif self.pattern_type == 5:
+            self.homing_pattern()
+        elif self.pattern_type == 6:
+            self.wave_pattern()
+        elif self.pattern_type == 7:
+            self.burst_pattern()
+        elif self.pattern_type == 8:
+            self.ring_pattern()
+        elif self.pattern_type == 9:
+            self.snake_pattern()
+    
+    def enhanced_spiral_pattern(self):
+        if self.pattern_timer % 12 == 0:
+            center_x = self.GAME_WIDTH // 2
+            center_y = self.GAME_HEIGHT // 2
+            
+            for spiral in range(2):
+                for i in range(6):
+                    self.spiral_angle += 0.1
+                    angle = (self.spiral_angle + i * math.pi / 3 + spiral * math.pi) % (2 * math.pi)
+                    speed = 1.5 + math.sin(self.pattern_timer * 0.02) * 0.5
+                    dx = math.cos(angle) * speed
+                    dy = math.sin(angle) * speed
+                    
+                    self.bullets.append({
+                        'x': center_x,
+                        'y': center_y,
+                        'dx': dx,
+                        'dy': dy,
+                        'color': 'orange' if spiral == 0 else 'pink'
+                    })
+    
+    def laser_pattern(self):
+        if self.pattern_sub_timer < 60:
+            if self.pattern_sub_timer % 10 == 0:
+                for i in range(4):
+                    angle = i * math.pi / 2 + self.pattern_sub_timer * 0.05
+                    start_x = self.GAME_WIDTH // 2 + math.cos(angle) * 50
+                    start_y = self.GAME_HEIGHT // 2 + math.sin(angle) * 50
+                    
+                    self.bullets.append({
+                        'x': start_x,
+                        'y': start_y,
+                        'dx': 0,
+                        'dy': 0,
+                        'color': 'white',
+                        'life': 30
+                    })
+        
+        elif self.pattern_sub_timer == 60:
+            center_x = self.GAME_WIDTH // 2
+            center_y = self.GAME_HEIGHT // 2
+            
+            for i in range(8):
+                angle = i * math.pi / 4
+                for j in range(15):
+                    distance = j * 8
+                    x = center_x + math.cos(angle) * distance
+                    y = center_y + math.sin(angle) * distance
+                    
+                    self.bullets.append({
+                        'x': x,
+                        'y': y,
+                        'dx': math.cos(angle) * 0.5,
+                        'dy': math.sin(angle) * 0.5,
+                        'color': 'cyan',
+                        'life': 120
+                    })
+    
+    def homing_pattern(self):
+        if self.pattern_timer % 45 == 0:
+            edge = random.choice(['top', 'bottom', 'left', 'right'])
+            
+            if edge == 'top':
+                x = random.randint(self.battle_box_x, self.battle_box_x + self.BATTLE_BOX_WIDTH)
+                y = self.battle_box_y
+            elif edge == 'bottom':
+                x = random.randint(self.battle_box_x, self.battle_box_x + self.BATTLE_BOX_WIDTH)
+                y = self.battle_box_y + self.BATTLE_BOX_HEIGHT
+            elif edge == 'left':
+                x = self.battle_box_x
+                y = random.randint(self.battle_box_y, self.battle_box_y + self.BATTLE_BOX_HEIGHT)
+            else:
+                x = self.battle_box_x + self.BATTLE_BOX_WIDTH
+                y = random.randint(self.battle_box_y, self.battle_box_y + self.BATTLE_BOX_HEIGHT)
+            
+            dx_to_player = self.player_x - x
+            dy_to_player = self.player_y - y
+            distance = math.sqrt(dx_to_player**2 + dy_to_player**2)
+            
+            if distance > 0:
+                dx = (dx_to_player / distance) * 1.5
+                dy = (dy_to_player / distance) * 1.5
+            else:
+                dx, dy = 1, 0
+            
+            self.bullets.append({
+                'x': x, 'y': y, 'dx': dx, 'dy': dy, 
+                'color': 'magenta', 'type': 'homing'
+            })
+    
+    def wave_pattern(self):
+        if self.pattern_timer % 8 == 0:
+            self.wave_offset += 0.2
+            
+            for side in ['top', 'bottom']:
+                x = self.battle_box_x + (self.pattern_sub_timer * 3) % self.BATTLE_BOX_WIDTH
+                
+                if side == 'top':
+                    y = self.battle_box_y
+                    base_dy = 2
+                else:
+                    y = self.battle_box_y + self.BATTLE_BOX_HEIGHT
+                    base_dy = -2
+                
+                wave_dx = math.sin(self.wave_offset + x * 0.02) * 1.5
+                
+                self.bullets.append({
+                    'x': x, 'y': y, 
+                    'dx': wave_dx, 'dy': base_dy,
+                    'color': 'lime' if side == 'top' else 'yellow'
+                })
+    
+    def burst_pattern(self):
+        if self.pattern_sub_timer % 90 == 0:
+            for _ in range(3):
+                burst_x = random.randint(self.battle_box_x + 50, 
+                                       self.battle_box_x + self.BATTLE_BOX_WIDTH - 50)
+                burst_y = random.randint(self.battle_box_y + 50, 
+                                       self.battle_box_y + self.BATTLE_BOX_HEIGHT - 50)
+                
+                for i in range(12):
+                    angle = i * math.pi / 6
+                    speed = random.uniform(1.5, 2.5)
+                    
+                    self.bullets.append({
+                        'x': burst_x,
+                        'y': burst_y,
+                        'dx': math.cos(angle) * speed,
+                        'dy': math.sin(angle) * speed,
+                        'color': 'red'
+                    })
+    
+    def ring_pattern(self):
+        if self.pattern_sub_timer % 40 == 0:
+            center_x = self.GAME_WIDTH // 2
+            center_y = self.GAME_HEIGHT // 2
+            
+            for ring in range(2):
+                ring_bullets = 16 + ring * 4
+                for i in range(ring_bullets):
+                    angle = (i * 2 * math.pi / ring_bullets) + (self.pattern_sub_timer * 0.02)
+                    speed = 1.8 + ring * 0.3
+                    
+                    start_radius = 30 + ring * 20
+                    start_x = center_x + math.cos(angle) * start_radius
+                    start_y = center_y + math.sin(angle) * start_radius
+                    
+                    self.bullets.append({
+                        'x': start_x,
+                        'y': start_y,
+                        'dx': math.cos(angle) * speed,
+                        'dy': math.sin(angle) * speed,
+                        'color': 'purple' if ring == 0 else 'blue'
+                    })
+    
+    def snake_pattern(self):
+        if self.pattern_timer % 6 == 0:
+            for side in ['left', 'right']:
+                if side == 'left':
+                    x = self.battle_box_x
+                    base_dx = 2.5
+                else:
+                    x = self.battle_box_x + self.BATTLE_BOX_WIDTH
+                    base_dx = -2.5
+                
+                y = (self.battle_box_y + self.BATTLE_BOX_HEIGHT // 2 + 
+                     math.sin(self.pattern_sub_timer * 0.1) * 100)
+                
+                y = max(self.battle_box_y, min(y, self.battle_box_y + self.BATTLE_BOX_HEIGHT))
+                
+                dy = math.cos(self.pattern_sub_timer * 0.1) * 0.5
+                
+                self.bullets.append({
+                    'x': x, 'y': y, 
+                    'dx': base_dx, 'dy': dy,
+                    'color': 'orange' if side == 'left' else 'cyan'
+                })
+    
+    def wall_pattern(self):
+        if random.random() < 0.3:
+            side = random.choice(['left', 'right', 'top', 'bottom'])
+            
+            if side == 'left':
+                x, y = self.battle_box_x, random.randint(self.battle_box_y, 
+                                                        self.battle_box_y + self.BATTLE_BOX_HEIGHT)
+                dx, dy = 2, 0
+            elif side == 'right':
+                x, y = self.battle_box_x + self.BATTLE_BOX_WIDTH, random.randint(
+                    self.battle_box_y, self.battle_box_y + self.BATTLE_BOX_HEIGHT)
+                dx, dy = -2, 0
+            elif side == 'top':
+                x, y = random.randint(self.battle_box_x, 
+                                     self.battle_box_x + self.BATTLE_BOX_WIDTH), self.battle_box_y
+                dx, dy = 0, 2
+            else:
+                x, y = random.randint(self.battle_box_x, 
+                                     self.battle_box_x + self.BATTLE_BOX_WIDTH), self.battle_box_y + self.BATTLE_BOX_HEIGHT
+                dx, dy = 0, -2
+            
+            self.bullets.append({
+                'x': x, 'y': y, 'dx': dx, 'dy': dy, 'color': 'cyan'
+            })
+    
+    def random_pattern(self):
+        if random.random() < 0.4:
+            edge = random.choice(['top', 'bottom', 'left', 'right'])
+            
+            if edge == 'top':
+                x = random.randint(self.battle_box_x, self.battle_box_x + self.BATTLE_BOX_WIDTH)
+                y = self.battle_box_y
+                angle = random.uniform(math.pi/4, 3*math.pi/4)
+            elif edge == 'bottom':
+                x = random.randint(self.battle_box_x, self.battle_box_x + self.BATTLE_BOX_WIDTH)
+                y = self.battle_box_y + self.BATTLE_BOX_HEIGHT
+                angle = random.uniform(-3*math.pi/4, -math.pi/4)
+            elif edge == 'left':
+                x = self.battle_box_x
+                y = random.randint(self.battle_box_y, self.battle_box_y + self.BATTLE_BOX_HEIGHT)
+                angle = random.uniform(-math.pi/4, math.pi/4)
+            else:
+                x = self.battle_box_x + self.BATTLE_BOX_WIDTH
+                y = random.randint(self.battle_box_y, self.battle_box_y + self.BATTLE_BOX_HEIGHT)
+                angle = random.uniform(3*math.pi/4, 5*math.pi/4)
+            
+            speed = random.uniform(1.5, 3)
+            dx = math.cos(angle) * speed
+            dy = math.sin(angle) * speed
+            
+            self.bullets.append({
+                'x': x, 'y': y, 'dx': dx, 'dy': dy, 'color': 'red'
+            })
+    
+    def cross_pattern(self):
+        center_x = self.GAME_WIDTH // 2
+        center_y = self.GAME_HEIGHT // 2
+        
+        if self.pattern_timer % 30 == 0:
+            directions = [(1,0), (-1,0), (0,1), (0,-1), (1,1), (-1,-1), (1,-1), (-1,1)]
+            
+            for dx, dy in directions:
+                if dx != 0 and dy != 0:
+                    dx *= 0.707
+                    dy *= 0.707
+                
+                self.bullets.append({
+                    'x': center_x,
+                    'y': center_y,
+                    'dx': dx * 2.5,
+                    'dy': dy * 2.5,
+                    'color': 'yellow'
+                })
+    
+    def update_bullets(self):
+        bullets_to_remove = []
+        
+        for i, bullet in enumerate(self.bullets):
+            if bullet.get('type') == 'homing':
+                dx_to_player = self.player_x - bullet['x']
+                dy_to_player = self.player_y - bullet['y']
+                distance = math.sqrt(dx_to_player**2 + dy_to_player**2)
+                
+                if distance > 0:
+                    homing_strength = 0.03
+                    bullet['dx'] += (dx_to_player / distance) * homing_strength
+                    bullet['dy'] += (dy_to_player / distance) * homing_strength
+                    
+                    speed = math.sqrt(bullet['dx']**2 + bullet['dy']**2)
+                    if speed > 3:
+                        bullet['dx'] = (bullet['dx'] / speed) * 3
+                        bullet['dy'] = (bullet['dy'] / speed) * 3
+            
+            bullet['x'] += bullet['dx']
+            bullet['y'] += bullet['dy']
+            
+            if 'life' in bullet:
+                bullet['life'] -= 1
+                if bullet['life'] <= 0:
+                    bullets_to_remove.append(i)
+                    continue
+            
+            if (bullet['x'] < -50 or bullet['x'] > self.GAME_WIDTH + 50 or
+                bullet['y'] < -50 or bullet['y'] > self.GAME_HEIGHT + 50):
+                bullets_to_remove.append(i)
+        
+        for i in reversed(bullets_to_remove):
+            del self.bullets[i]
+    
+    def check_collisions(self):
+        if self.invulnerable:
+            self.invuln_timer -= 1
+            if self.invuln_timer <= 0:
+                self.invulnerable = False
+            return
+        
+        player_rect = (self.player_x - self.PLAYER_SIZE//2, 
+                      self.player_y - self.PLAYER_SIZE//2,
+                      self.player_x + self.PLAYER_SIZE//2, 
+                      self.player_y + self.PLAYER_SIZE//2)
+        
+        for bullet in self.bullets:
+            bullet_rect = (bullet['x'] - self.BULLET_SIZE//2, 
+                          bullet['y'] - self.BULLET_SIZE//2,
+                          bullet['x'] + self.BULLET_SIZE//2, 
+                          bullet['y'] + self.BULLET_SIZE//2)
+            
+            if (player_rect[0] < bullet_rect[2] and player_rect[2] > bullet_rect[0] and
+                player_rect[1] < bullet_rect[3] and player_rect[3] > bullet_rect[1]):
+                
+                self.hp -= 1
+                self.invulnerable = True
+                self.invuln_timer = 60
+                
+                if self.hp <= 0:
+                    self.game_over()
+                break
+    
+    def draw_everything(self):
+        self.canvas.delete('game_object')
+        
+        if self.in_cutscene:
+            # Draw mysterious figure (a larger white oval with purple outline)
+            self.canvas.create_oval(
+                self.figure_x - 15, self.figure_y - 15,
+                self.figure_x + 15, self.figure_y + 15,
+                fill='white', outline='purple', width=2, tags='figure'
+            )
+            # Dim battle box during cutscene
+            self.canvas.itemconfig(self.battle_box, outline='grey')
+        else:
+            # Draw player
+            if not self.invulnerable or (self.invulnerable and self.invuln_timer % 10 < 5):
+                self.canvas.create_oval(
+                    self.player_x - self.PLAYER_SIZE//2,
+                    self.player_y - self.PLAYER_SIZE//2,
+                    self.player_x + self.PLAYER_SIZE//2,
+                    self.player_y + self.PLAYER_SIZE//2,
+                    fill='red', outline='white', tags='game_object'
+                )
+        
+            # Draw bullets
+            for bullet in self.bullets:
+                size = self.BULLET_SIZE
+                if bullet.get('type') == 'homing':
+                    size = self.BULLET_SIZE + 1
+                elif 'life' in bullet and bullet['color'] == 'cyan':
+                    size = self.BULLET_SIZE + 2
+                
+                self.canvas.create_oval(
+                    bullet['x'] - size//2,
+                    bullet['y'] - size//2,
+                    bullet['x'] + size//2,
+                    bullet['y'] + size//2,
+                    fill=bullet['color'], outline='white', tags='game_object'
+                )
+    
+    def game_over(self):
+        self.game_running = False
+        self.canvas.create_rectangle(100, 120, 500, 280, fill='black', outline='white', width=3)
+        self.canvas.create_text(300, 150, text="GAME OVER", fill='red', 
+                               font=('Arial', 24, 'bold'))
+        self.canvas.create_text(300, 180, text=f"Final Score: {self.score}", 
+                               fill='white', font=('Arial', 16))
+        self.canvas.create_text(300, 210, text="You survived all 10 attack patterns!", 
+                               fill='yellow', font=('Arial', 12))
+        self.canvas.create_text(300, 240, text="Patterns: Spiral, Wall, Random, Cross,", 
+                               fill='white', font=('Arial', 10))
+        self.canvas.create_text(300, 255, text="Laser, Homing, Wave, Burst, Ring, Snake", 
+                               fill='white', font=('Arial', 10))
+    
+    def game_loop(self):
+        if self.in_cutscene:
+            self.handle_cutscene()
+        elif self.game_running:
+            self.move_player()
+            self.create_bullet_pattern()
+            self.update_bullets()
+            self.check_collisions()
+            self.score += 1
+            self.update_ui()
+        
+        self.draw_everything()
+        self.root.after(16, self.game_loop)
+
+if __name__ == "__main__":
+    root = tk.Tk()
+    game = BulletHellGame(root)
+    root.mainloop()
