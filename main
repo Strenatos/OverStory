@@ -6,7 +6,7 @@ import time
 class BulletHellGame:
     def __init__(self, root):
         self.root = root
-        self.root.title("Bullet Hell Game - Enhanced")
+        self.root.title("Bullet Hell Game - Phase 2 Enhanced")
         self.root.configure(bg='black')
         
         # Game constants
@@ -16,6 +16,7 @@ class BulletHellGame:
         self.BATTLE_BOX_HEIGHT = 300
         self.PLAYER_SIZE = 8
         self.BULLET_SIZE = 4
+        self.STAR_SIZE = 12
         
         # Calculate battle box position (centered)
         self.battle_box_x = (self.GAME_WIDTH - self.BATTLE_BOX_WIDTH) // 2
@@ -26,13 +27,16 @@ class BulletHellGame:
         self.canvas.pack()
         
         # Game state
-        self.game_running = False  # Start with game paused for cutscene
+        self.game_running = False
         self.in_cutscene = True
         self.cutscene_timer = 0
         self.figure_x = self.GAME_WIDTH // 2
         self.figure_y = self.GAME_HEIGHT // 2
-        self.figure_target_y = self.battle_box_y - 20  # Position above battle box
-        self.figure_speed = 2
+        self.figure_target_y = self.battle_box_y - 40  # Position above battle box
+        self.figure_speed = 5
+        self.boss_size = 30  # Boss size
+        self.boss_glow = 0  # For glow animation
+        self.boss_anger = 0  # Anger level (increases in phase 2)
         self.dialogue_index = 0
         self.dialogue_timer = 0
         self.dialogue = [
@@ -40,6 +44,33 @@ class BulletHellGame:
             "You think you can survive my attacks?",
             "Prepare yourself... The battle begins!",
         ]
+        
+        # Phase 2 variables
+        self.phase = 1
+        self.phase2_pattern = 0
+        self.boss_hp = 5
+        self.boss_max_hp = 5
+        self.star_active = False
+        self.star_x = 0
+        self.star_y = 0
+        self.star_collected = 0
+        self.phase2_dialogue = [
+            "WHAT?! Impossible! You survived Phase 1?!",
+            "I'll CRUSH you with my TRUE POWER!",
+            "FACE MY WRATH! THIS ENDS NOW!"
+        ]
+        self.phase2_dialogue_index = 0
+        self.transitioning_to_phase2 = False
+        self.phase2_transition_timer = 0
+        self.victory_dialogue = [
+            "NOOO... THIS CANNOT BE...!",
+            "How... how could I... be defeated...",
+            "You... You... YOU...",
+            "I WILL BE BACK! YOU HAVEN'T SEEN THE LAST OF ME!"
+        ]
+        self.victory_dialogue_index = 0
+        self.in_victory = False
+        self.victory_timer = 0
         
         self.player_x = 110
         self.player_y = 80
@@ -51,6 +82,14 @@ class BulletHellGame:
         self.invulnerable = False
         self.invuln_timer = 0
         
+        # Healing effect
+        self.healing_particles = []
+        
+        # Power-up system - collecting stars gives temporary power
+        self.power_up_active = False
+        self.power_up_timer = 0
+        self.power_up_type = None  # 'speed', 'shield', 'slowmo'
+        
         # Enhanced enemy patterns
         self.pattern_timer = 0
         self.pattern_type = 0
@@ -59,11 +98,12 @@ class BulletHellGame:
         self.spiral_angle = 0
         self.laser_charge_timer = 0
         self.targeting_bullets = []
+        self.patterns_completed = 0
         
         # Create UI elements
         self.create_ui()
         
-        # Bind keys (add arrow keys)
+        # Bind keys
         self.keys_pressed = set()
         root.bind('<KeyPress>', self.key_press)
         root.bind('<KeyRelease>', self.key_release)
@@ -84,15 +124,17 @@ class BulletHellGame:
         # HP bar background
         self.canvas.create_rectangle(50, 50, 250, 70, fill='red', tags='ui')
         
-        # Instructions (updated for arrow keys)
-        self.canvas.create_text(self.GAME_WIDTH//2, 30, text="WASD or Arrow Keys to move • Survive the enhanced bullet patterns!", 
-                               fill='white', font=('Arial', 12), tags='ui')
+        # Instructions
+        self.canvas.create_text(self.GAME_WIDTH//2, 15, text="WASD/Arrows to move • Survive! • Stars heal you!", 
+                               fill='white', font=('Arial', 11), tags='ui')
     
     def update_ui(self):
         # Clear old UI
         self.canvas.delete('hp_bar')
         self.canvas.delete('score_text')
         self.canvas.delete('pattern_text')
+        self.canvas.delete('boss_hp_bar')
+        self.canvas.delete('phase_text')
         
         # HP bar (green portion)
         hp_width = int(200 * (self.hp / self.max_hp))
@@ -107,13 +149,51 @@ class BulletHellGame:
         self.canvas.create_text(400, 60, text=f"Score: {self.score}", 
                                fill='white', font=('Arial', 12), tags='score_text')
         
-        # Current pattern indicator
-        pattern_names = ["Spiral", "Wall", "Random", "Cross", "Laser", "Homing", "Wave", "Burst", "Ring", "Snake"]
-        self.canvas.create_text(500, 80, text=f"Pattern: {pattern_names[self.pattern_type]}", 
-                               fill='yellow', font=('Arial', 10), tags='pattern_text')
+        # Power-up indicator
+        if self.power_up_active:
+            power_up_names = {
+                'speed': '⚡ SPEED BOOST',
+                'shield': '🛡️ SHIELD',
+                'slowmo': '🕐 SLOW-MO'
+            }
+            power_up_colors = {
+                'speed': 'yellow',
+                'shield': 'cyan',
+                'slowmo': 'magenta'
+            }
+            self.canvas.create_text(300, 85, 
+                                   text=power_up_names.get(self.power_up_type, ''),
+                                   fill=power_up_colors.get(self.power_up_type, 'white'),
+                                   font=('Arial', 12, 'bold'), tags='score_text')
+        
+        # Phase indicator
+        if self.phase == 1:
+            pattern_names = ["Spiral", "Wall", "Random", "Cross", "Laser", "Homing", "Wave", "Burst", "Ring", "Snake"]
+            self.canvas.create_text(500, 80, text=f"Pattern: {pattern_names[self.pattern_type]}", 
+                                   fill='yellow', font=('Arial', 10), tags='pattern_text')
+            self.canvas.create_text(500, 95, text=f"Phase 1 ({self.patterns_completed}/10)", 
+                                   fill='cyan', font=('Arial', 9), tags='phase_text')
+        else:
+            # Phase 2 - Boss HP bar
+            boss_hp_width = int(300 * (self.boss_hp / self.boss_max_hp))
+            self.canvas.create_rectangle(150, 35, 450, 50, fill='darkred', outline='white', width=2, tags='boss_hp_bar')
+            if boss_hp_width > 0:
+                self.canvas.create_rectangle(150, 35, 150 + boss_hp_width, 50, fill='red', tags='boss_hp_bar')
+            self.canvas.create_text(300, 42, text=f"BOSS HP: {self.boss_hp}/{self.boss_max_hp}", 
+                                   fill='white', font=('Arial', 10, 'bold'), tags='boss_hp_bar')
+            
+            phase2_names = ["Chaos Storm", "Death Spiral", "Void Prison", "Meteor Rain", "Final Judgement"]
+            self.canvas.create_text(500, 80, text=f"Attack: {phase2_names[self.phase2_pattern]}", 
+                                   fill='red', font=('Arial', 10, 'bold'), tags='pattern_text')
+            self.canvas.create_text(500, 95, text=f"PHASE 2 ({self.star_collected}/5)", 
+                                   fill='magenta', font=('Arial', 9, 'bold'), tags='phase_text')
     
     def key_press(self, event):
         self.keys_pressed.add(event.keysym.lower())
+        
+        # Secret code: Press 5 to skip to Phase 2
+        if event.keysym == '5' and self.phase == 1 and self.game_running:
+            self.start_phase2_transition()
     
     def key_release(self, event):
         self.keys_pressed.discard(event.keysym.lower())
@@ -131,9 +211,14 @@ class BulletHellGame:
         if 'd' in self.keys_pressed or 'right' in self.keys_pressed:
             dx += self.player_speed
         
+        # Apply speed power-up
+        if self.power_up_active and self.power_up_type == 'speed':
+            dx *= 1.5
+            dy *= 1.5
+        
         # Diagonal movement normalization
         if dx != 0 and dy != 0:
-            dx *= 0.707  # 1/sqrt(2)
+            dx *= 0.707
             dy *= 0.707
         
         # Update position with boundary checking
@@ -148,6 +233,13 @@ class BulletHellGame:
         if (self.battle_box_y + self.PLAYER_SIZE <= new_y <= 
             self.battle_box_y + self.BATTLE_BOX_HEIGHT - self.PLAYER_SIZE):
             self.player_y = new_y
+        
+        # Update power-up timer
+        if self.power_up_active:
+            self.power_up_timer -= 1
+            if self.power_up_timer <= 0:
+                self.power_up_active = False
+                self.power_up_type = None
     
     def handle_cutscene(self):
         self.cutscene_timer += 1
@@ -156,13 +248,13 @@ class BulletHellGame:
         if self.dialogue_index < len(self.dialogue):
             self.canvas.delete('dialogue')
             self.canvas.create_text(
-                self.GAME_WIDTH // 2, self.GAME_HEIGHT - 50,
+                self.GAME_WIDTH // 2, self.GAME_HEIGHT - 70,
                 text=self.dialogue[self.dialogue_index],
                 fill='white', font=('Arial', 14), tags='dialogue'
             )
             
-            # Advance dialogue every 2 seconds (120 frames at 60fps)
-            if self.cutscene_timer % 120 == 0:
+            # Advance dialogue every 2 seconds
+            if self.cutscene_timer % 110 == 0:
                 self.dialogue_index += 1
                 
         # Move figure to top after dialogue is complete
@@ -175,39 +267,377 @@ class BulletHellGame:
                 self.game_running = True
                 self.canvas.delete('dialogue')
                 self.canvas.delete('figure')
-                self.canvas.itemconfig(self.battle_box, outline='white')  # Show battle box
+                self.canvas.itemconfig(self.battle_box, outline='white')
+    
+    def handle_phase2_transition(self):
+        self.phase2_transition_timer += 1
+        
+        # Clear all bullets
+        if self.phase2_transition_timer == 1:
+            self.bullets = []
+        
+        # Flash effect
+        if self.phase2_transition_timer % 20 < 10:
+            self.canvas.itemconfig(self.battle_box, outline='red')
+        else:
+            self.canvas.itemconfig(self.battle_box, outline='purple')
+        
+        # Display dialogue
+        if self.phase2_dialogue_index < len(self.phase2_dialogue):
+            self.canvas.delete('dialogue')
+            # Create text box background for better readability
+            text = self.phase2_dialogue[self.phase2_dialogue_index]
+            self.canvas.create_rectangle(50, self.GAME_HEIGHT - 90, 550, self.GAME_HEIGHT - 50,
+                                        fill='black', outline='red', width=2, tags='dialogue')
+            self.canvas.create_text(
+                self.GAME_WIDTH // 2, self.GAME_HEIGHT - 70,
+                text=text,
+                fill='red', font=('Arial', 14, 'bold'), tags='dialogue'
+            )
+            
+            if self.phase2_transition_timer % 120 == 0:
+                self.phase2_dialogue_index += 1
+        else:
+            # Transition complete
+            if self.phase2_transition_timer > 360:
+                self.transitioning_to_phase2 = False
+                self.game_running = True
+                self.canvas.delete('dialogue')
+                self.canvas.itemconfig(self.battle_box, outline='white')
+    
+    def handle_victory(self):
+        self.victory_timer += 1
+        
+        # Clear bullets
+        if self.victory_timer == 1:
+            self.bullets = []
+        
+        # Victory flash
+        if self.victory_timer % 30 < 15:
+            self.canvas.itemconfig(self.battle_box, outline='gold')
+        else:
+            self.canvas.itemconfig(self.battle_box, outline='yellow')
+        
+        # Display victory dialogue
+        if self.victory_dialogue_index < len(self.victory_dialogue):
+            self.canvas.delete('dialogue')
+            text = self.victory_dialogue[self.victory_dialogue_index]
+            self.canvas.create_rectangle(50, self.GAME_HEIGHT - 90, 550, self.GAME_HEIGHT - 50,
+                                        fill='black', outline='gold', width=2, tags='dialogue')
+            self.canvas.create_text(
+                self.GAME_WIDTH // 2, self.GAME_HEIGHT - 70,
+                text=text,
+                fill='gold', font=('Arial', 14, 'bold'), tags='dialogue'
+            )
+            
+            if self.victory_timer % 120 == 0:
+                self.victory_dialogue_index += 1
+        else:
+            # Show victory screen
+            if self.victory_timer > 360:
+                self.show_victory_screen()
+    
+    def show_victory_screen(self):
+        self.game_running = False
+        self.in_victory = False
+        self.canvas.create_rectangle(80, 100, 520, 300, fill='black', outline='gold', width=4)
+        self.canvas.create_text(300, 130, text="VICTORY!", fill='gold', 
+                               font=('Arial', 32, 'bold'))
+        self.canvas.create_text(300, 170, text=f"Final Score: {self.score}", 
+                               fill='white', font=('Arial', 18))
+        self.canvas.create_text(300, 200, text="You have defeated the boss!", 
+                               fill='yellow', font=('Arial', 14))
+        self.canvas.create_text(300, 230, text="Phase 1: All 10 patterns survived", 
+                               fill='cyan', font=('Arial', 11))
+        self.canvas.create_text(300, 250, text="Phase 2: All 5 ultimate attacks defeated", 
+                               fill='magenta', font=('Arial', 11))
+        self.canvas.create_text(300, 275, text="You are the true champion!", 
+                               fill='gold', font=('Arial', 12, 'bold'))
     
     def create_bullet_pattern(self):
         self.pattern_timer += 1
         self.pattern_sub_timer += 1
         
-        # Change pattern every 4 seconds (240 frames at 60fps)
-        if self.pattern_timer % 240 == 0:
-            self.pattern_type = (self.pattern_type + 1) % 10
-            self.pattern_sub_timer = 0
+        if self.phase == 1:
+            # Change pattern every 4 seconds
+            if self.pattern_timer % 240 == 0:
+                self.pattern_type = (self.pattern_type + 1) % 10
+                self.pattern_sub_timer = 0
+                self.patterns_completed += 1
+                
+                # Check if Phase 1 complete
+                if self.patterns_completed >= 10:
+                    self.start_phase2_transition()
+            
+            # Phase 1 patterns
+            if self.pattern_type == 0:
+                self.enhanced_spiral_pattern()
+            elif self.pattern_type == 1:
+                self.wall_pattern()
+            elif self.pattern_type == 2:
+                self.random_pattern()
+            elif self.pattern_type == 3:
+                self.cross_pattern()
+            elif self.pattern_type == 4:
+                self.laser_pattern()
+            elif self.pattern_type == 5:
+                self.homing_pattern()
+            elif self.pattern_type == 6:
+                self.wave_pattern()
+            elif self.pattern_type == 7:
+                self.burst_pattern()
+            elif self.pattern_type == 8:
+                self.ring_pattern()
+            elif self.pattern_type == 9:
+                self.snake_pattern()
         
-        # Spawn bullets based on current pattern
-        if self.pattern_type == 0:
-            self.enhanced_spiral_pattern()
-        elif self.pattern_type == 1:
-            self.wall_pattern()
-        elif self.pattern_type == 2:
-            self.random_pattern()
-        elif self.pattern_type == 3:
-            self.cross_pattern()
-        elif self.pattern_type == 4:
-            self.laser_pattern()
-        elif self.pattern_type == 5:
-            self.homing_pattern()
-        elif self.pattern_type == 6:
-            self.wave_pattern()
-        elif self.pattern_type == 7:
-            self.burst_pattern()
-        elif self.pattern_type == 8:
-            self.ring_pattern()
-        elif self.pattern_type == 9:
-            self.snake_pattern()
+        elif self.phase == 2:
+            # Phase 2 attack lasts 6 seconds, then spawn star
+            if self.pattern_sub_timer >= 360:
+                if not self.star_active:
+                    self.spawn_star()
+            else:
+                # Phase 2 patterns (harder)
+                if self.phase2_pattern == 0:
+                    self.chaos_storm_pattern()
+                elif self.phase2_pattern == 1:
+                    self.death_spiral_pattern()
+                elif self.phase2_pattern == 2:
+                    self.void_prison_pattern()
+                elif self.phase2_pattern == 3:
+                    self.meteor_rain_pattern()
+                elif self.phase2_pattern == 4:
+                    self.final_judgement_pattern()
     
+    def start_phase2_transition(self):
+        self.game_running = False
+        self.transitioning_to_phase2 = True
+        self.phase = 2
+        self.phase2_transition_timer = 0
+        self.pattern_timer = 0
+        self.pattern_sub_timer = 0
+    
+    def spawn_star(self):
+        self.star_active = True
+        # Random position in battle box
+        self.star_x = random.randint(self.battle_box_x + 30, 
+                                     self.battle_box_x + self.BATTLE_BOX_WIDTH - 30)
+        self.star_y = random.randint(self.battle_box_y + 30, 
+                                     self.battle_box_y + self.BATTLE_BOX_HEIGHT - 30)
+        # Stop spawning bullets
+        self.bullets = []
+    
+    def check_star_collection(self):
+        if not self.star_active:
+            return
+        
+        dx = self.player_x - self.star_x
+        dy = self.player_y - self.star_y
+        distance = math.sqrt(dx**2 + dy**2)
+        
+        if distance < (self.PLAYER_SIZE + self.STAR_SIZE) // 2:
+            # Star collected!
+            self.star_active = False
+            self.star_collected += 1
+            self.boss_hp -= 1
+            self.score += 500
+            
+            # Heal player by 3 HP (but don't exceed max HP)
+            old_hp = self.hp
+            self.hp = min(self.hp + 3, self.max_hp)
+            
+            # Create healing particles
+            if self.hp > old_hp:
+                for _ in range(15):
+                    angle = random.uniform(0, 2 * math.pi)
+                    speed = random.uniform(1, 3)
+                    self.healing_particles.append({
+                        'x': self.player_x,
+                        'y': self.player_y,
+                        'dx': math.cos(angle) * speed,
+                        'dy': math.sin(angle) * speed,
+                        'life': 30,
+                        'color': 'lime'
+                    })
+            
+            # Random power-up!
+            power_ups = ['speed', 'shield', 'slowmo']
+            self.power_up_type = random.choice(power_ups)
+            self.power_up_active = True
+            self.power_up_timer = 180  # 3 seconds at 60fps
+            
+            if self.boss_hp <= 0:
+                # Victory!
+                self.game_running = False
+                self.in_victory = True
+                self.victory_timer = 0
+            else:
+                # Next attack
+                self.phase2_pattern = (self.phase2_pattern + 1) % 5
+                self.pattern_sub_timer = 0
+                self.pattern_timer = 0
+    
+    # Phase 2 Attack Patterns (HARDER)
+    def chaos_storm_pattern(self):
+        # Massive random bullet spam from all directions (NERFED)
+        if self.pattern_timer % 6 == 0:  # Reduced from every 5 frames to every 8
+            for _ in range(2):  # Reduced from 3 bullets to 2
+                edge = random.choice(['top', 'bottom', 'left', 'right'])
+                
+                if edge == 'top':
+                    x = random.randint(self.battle_box_x, self.battle_box_x + self.BATTLE_BOX_WIDTH)
+                    y = self.battle_box_y
+                    angle = random.uniform(math.pi/6, 5*math.pi/6)
+                elif edge == 'bottom':
+                    x = random.randint(self.battle_box_x, self.battle_box_x + self.BATTLE_BOX_WIDTH)
+                    y = self.battle_box_y + self.BATTLE_BOX_HEIGHT
+                    angle = random.uniform(-5*math.pi/6, -math.pi/6)
+                elif edge == 'left':
+                    x = self.battle_box_x
+                    y = random.randint(self.battle_box_y, self.battle_box_y + self.BATTLE_BOX_HEIGHT)
+                    angle = random.uniform(-math.pi/3, math.pi/3)
+                else:
+                    x = self.battle_box_x + self.BATTLE_BOX_WIDTH
+                    y = random.randint(self.battle_box_y, self.battle_box_y + self.BATTLE_BOX_HEIGHT)
+                    angle = random.uniform(2*math.pi/3, 4*math.pi/3)
+                
+                speed = random.uniform(2.0, 3.0)  # Reduced from 2.5-4.0
+                self.bullets.append({
+                    'x': x, 'y': y,
+                    'dx': math.cos(angle) * speed,
+                    'dy': math.sin(angle) * speed,
+                    'color': random.choice(['red', 'orange', 'yellow']),
+                    'size': 10  # Bigger bullets!
+                })
+    
+    def death_spiral_pattern(self):
+        # Multiple fast spirals from center (NERFED)
+        if self.pattern_timer % 8 == 0:  # Reduced from every 8 frames to every 12
+            center_x = self.GAME_WIDTH // 2
+            center_y = self.GAME_HEIGHT // 2
+            
+            for spiral in range(4):  # Reduced from 3 spirals to 2
+                for i in range(8):  # Reduced from 8 bullets to 6
+                    angle = (self.spiral_angle + i * math.pi / 3 + spiral * math.pi) % (2 * math.pi)
+                    speed = 2.0 + math.sin(self.pattern_timer * 0.03) * 0.5  # Reduced from 2.5
+                    
+                    self.bullets.append({
+                        'x': center_x,
+                        'y': center_y,
+                        'dx': math.cos(angle) * speed,
+                        'dy': math.sin(angle) * speed,
+                        'color': ['purple', 'magenta', 'violet', 'pink'][spiral]
+                    })
+            self.spiral_angle += 0.15
+    
+    def void_prison_pattern(self):
+        # Bullets from edges moving to center, creating a cage (BUFFED)
+        if self.pattern_timer % 8 == 0:  # Increased spawn rate from every 12 frames to 8
+            center_x = self.GAME_WIDTH // 2
+            center_y = self.GAME_HEIGHT // 2
+            
+            # From all four sides (spawn 2 bullets per side now)
+            for i in range(4):
+                for offset in [0, self.BATTLE_BOX_WIDTH // 4]:  # Spawn 2 bullets per side
+                    if i == 0:  # Top
+                        x = self.battle_box_x + (self.pattern_sub_timer * 10 + offset) % self.BATTLE_BOX_WIDTH
+                        y = self.battle_box_y
+                    elif i == 1:  # Bottom
+                        x = self.battle_box_x + (self.pattern_sub_timer * 10 + offset) % self.BATTLE_BOX_WIDTH
+                        y = self.battle_box_y + self.BATTLE_BOX_HEIGHT
+                    elif i == 2:  # Left
+                        x = self.battle_box_x
+                        y = self.battle_box_y + (self.pattern_sub_timer * 10 + offset) % self.BATTLE_BOX_HEIGHT
+                    else:  # Right
+                        x = self.battle_box_x + self.BATTLE_BOX_WIDTH
+                        y = self.battle_box_y + (self.pattern_sub_timer * 10 + offset) % self.BATTLE_BOX_HEIGHT
+                    
+                    dx = (center_x - x) * 0.015
+                    dy = (center_y - y) * 0.015
+                    
+                    self.bullets.append({
+                        'x': x, 'y': y,
+                        'dx': dx, 'dy': dy,
+                        'color': 'cyan'
+                    })
+    
+    def meteor_rain_pattern(self):
+        # Large bullets falling from top with homing
+        if self.pattern_timer % 20 == 0:
+            x = random.randint(self.battle_box_x + 20, 
+                             self.battle_box_x + self.BATTLE_BOX_WIDTH - 20)
+            y = self.battle_box_y - 20
+            
+            dx_to_player = self.player_x - x
+            dy_to_player = self.player_y - y
+            distance = math.sqrt(dx_to_player**2 + dy_to_player**2)
+            
+            if distance > 0:
+                speed = 7
+                dx = (dx_to_player / distance) * speed
+                dy = (dy_to_player / distance) * speed
+            else:
+                dx, dy = 0, 5
+            
+            self.bullets.append({
+                'x': x, 'y': y,
+                'dx': dx, 'dy': dy,
+                'color': 'orange',
+                'type': 'meteor',
+                'size': 50  # MASSIVE meteors!
+            })
+    
+    def final_judgement_pattern(self):
+        # Combination of multiple attacks
+        if self.pattern_timer % 15 == 0:
+            center_x = self.GAME_WIDTH // 2
+            center_y = self.GAME_HEIGHT // 2
+            
+            # Ring
+            for i in range(12):
+                angle = i * 2 * math.pi / 12 + self.pattern_timer * 0.02
+                speed = 2.0
+                self.bullets.append({
+                    'x': center_x,
+                    'y': center_y,
+                    'dx': math.cos(angle) * speed,
+                    'dy': math.sin(angle) * speed,
+                    'color': 'gold'
+                })
+        
+        # Homing bullets
+        if self.pattern_timer % 40 == 0:
+            edge = random.choice(['top', 'bottom', 'left', 'right'])
+            
+            if edge == 'top':
+                x = random.randint(self.battle_box_x, self.battle_box_x + self.BATTLE_BOX_WIDTH)
+                y = self.battle_box_y
+            elif edge == 'bottom':
+                x = random.randint(self.battle_box_x, self.battle_box_x + self.BATTLE_BOX_WIDTH)
+                y = self.battle_box_y + self.BATTLE_BOX_HEIGHT
+            elif edge == 'left':
+                x = self.battle_box_x
+                y = random.randint(self.battle_box_y, self.battle_box_y + self.BATTLE_BOX_HEIGHT)
+            else:
+                x = self.battle_box_x + self.BATTLE_BOX_WIDTH
+                y = random.randint(self.battle_box_y, self.battle_box_y + self.BATTLE_BOX_HEIGHT)
+            
+            dx_to_player = self.player_x - x
+            dy_to_player = self.player_y - y
+            distance = math.sqrt(dx_to_player**2 + dy_to_player**2)
+            
+            if distance > 0:
+                dx = (dx_to_player / distance) * 2.0
+                dy = (dy_to_player / distance) * 2.0
+            else:
+                dx, dy = 1, 0
+            
+            self.bullets.append({
+                'x': x, 'y': y, 'dx': dx, 'dy': dy, 
+                'color': 'red', 'type': 'homing'
+            })
+    
+    # Phase 1 patterns (keeping original)
     def enhanced_spiral_pattern(self):
         if self.pattern_timer % 12 == 0:
             center_x = self.GAME_WIDTH // 2
@@ -463,6 +893,9 @@ class BulletHellGame:
     def update_bullets(self):
         bullets_to_remove = []
         
+        # Slow-mo power-up effect
+        slowmo_factor = 0.5 if (self.power_up_active and self.power_up_type == 'slowmo') else 1.0
+        
         for i, bullet in enumerate(self.bullets):
             if bullet.get('type') == 'homing':
                 dx_to_player = self.player_x - bullet['x']
@@ -479,8 +912,9 @@ class BulletHellGame:
                         bullet['dx'] = (bullet['dx'] / speed) * 3
                         bullet['dy'] = (bullet['dy'] / speed) * 3
             
-            bullet['x'] += bullet['dx']
-            bullet['y'] += bullet['dy']
+            # Apply slowmo to bullet movement
+            bullet['x'] += bullet['dx'] * slowmo_factor
+            bullet['y'] += bullet['dy'] * slowmo_factor
             
             if 'life' in bullet:
                 bullet['life'] -= 1
@@ -502,23 +936,49 @@ class BulletHellGame:
                 self.invulnerable = False
             return
         
+        # Shield power-up blocks one hit
+        if self.power_up_active and self.power_up_type == 'shield':
+            # Check for collision but don't take damage - just disable shield
+            player_rect = (self.player_x - self.PLAYER_SIZE//2, 
+                          self.player_y - self.PLAYER_SIZE//2,
+                          self.player_x + self.PLAYER_SIZE//2, 
+                          self.player_y + self.PLAYER_SIZE//2)
+            
+            for bullet in self.bullets:
+                bullet_size = bullet.get('size', self.BULLET_SIZE)
+                bullet_rect = (bullet['x'] - bullet_size//2, 
+                              bullet['y'] - bullet_size//2,
+                              bullet['x'] + bullet_size//2, 
+                              bullet['y'] + bullet_size//2)
+                
+                if (player_rect[0] < bullet_rect[2] and player_rect[2] > bullet_rect[0] and
+                    player_rect[1] < bullet_rect[3] and player_rect[3] > bullet_rect[1]):
+                    # Shield absorbed the hit!
+                    self.power_up_active = False
+                    self.power_up_type = None
+                    self.invulnerable = True
+                    self.invuln_timer = 10
+                    break
+            return
+        
         player_rect = (self.player_x - self.PLAYER_SIZE//2, 
                       self.player_y - self.PLAYER_SIZE//2,
                       self.player_x + self.PLAYER_SIZE//2, 
                       self.player_y + self.PLAYER_SIZE//2)
         
         for bullet in self.bullets:
-            bullet_rect = (bullet['x'] - self.BULLET_SIZE//2, 
-                          bullet['y'] - self.BULLET_SIZE//2,
-                          bullet['x'] + self.BULLET_SIZE//2, 
-                          bullet['y'] + self.BULLET_SIZE//2)
+            bullet_size = bullet.get('size', self.BULLET_SIZE)
+            bullet_rect = (bullet['x'] - bullet_size//2, 
+                          bullet['y'] - bullet_size//2,
+                          bullet['x'] + bullet_size//2, 
+                          bullet['y'] + bullet_size//2)
             
             if (player_rect[0] < bullet_rect[2] and player_rect[2] > bullet_rect[0] and
                 player_rect[1] < bullet_rect[3] and player_rect[3] > bullet_rect[1]):
                 
                 self.hp -= 1
                 self.invulnerable = True
-                self.invuln_timer = 60
+                self.invuln_timer = 10
                 
                 if self.hp <= 0:
                     self.game_over()
@@ -528,17 +988,152 @@ class BulletHellGame:
         self.canvas.delete('game_object')
         
         if self.in_cutscene:
-            # Draw mysterious figure (a larger white oval with purple outline)
+            # Draw mysterious boss figure with better appearance
+            self.boss_glow += 0.1
+            glow_size = 5 + abs(math.sin(self.boss_glow) * 3)
+            
+            # Outer glow
             self.canvas.create_oval(
-                self.figure_x - 15, self.figure_y - 15,
-                self.figure_x + 15, self.figure_y + 15,
+                self.figure_x - self.boss_size - glow_size, 
+                self.figure_y - self.boss_size - glow_size,
+                self.figure_x + self.boss_size + glow_size, 
+                self.figure_y + self.boss_size + glow_size,
+                fill='', outline='purple', width=2, tags='figure'
+            )
+            # Middle layer
+            self.canvas.create_oval(
+                self.figure_x - self.boss_size + 5, 
+                self.figure_y - self.boss_size + 5,
+                self.figure_x + self.boss_size - 5, 
+                self.figure_y + self.boss_size - 5,
+                fill='darkviolet', outline='', tags='figure'
+            )
+            # Core
+            self.canvas.create_oval(
+                self.figure_x - self.boss_size // 2, 
+                self.figure_y - self.boss_size // 2,
+                self.figure_x + self.boss_size // 2, 
+                self.figure_y + self.boss_size // 2,
                 fill='white', outline='purple', width=2, tags='figure'
             )
-            # Dim battle box during cutscene
+            # Eyes
+            eye_offset = 8
+            self.canvas.create_oval(
+                self.figure_x - eye_offset - 3, self.figure_y - 5,
+                self.figure_x - eye_offset + 3, self.figure_y + 1,
+                fill='red', outline='', tags='figure'
+            )
+            self.canvas.create_oval(
+                self.figure_x + eye_offset - 3, self.figure_y - 5,
+                self.figure_x + eye_offset + 3, self.figure_y + 1,
+                fill='red', outline='', tags='figure'
+            )
             self.canvas.itemconfig(self.battle_box, outline='grey')
         else:
+            # Draw boss in background during Phase 2
+            if self.phase == 2 and self.game_running:
+                boss_bg_x = self.GAME_WIDTH // 2
+                boss_bg_y = 60
+                self.boss_glow += 0.1
+                
+                # Increase anger as HP decreases
+                self.boss_anger = (self.boss_max_hp - self.boss_hp) * 2
+                
+                # Pulsing glow (more intense when lower HP)
+                glow_size = 8 + abs(math.sin(self.boss_glow) * (5 + self.boss_anger))
+                glow_color = 'purple' if self.boss_hp > 2 else 'red'
+                
+                # Outer glow
+                self.canvas.create_oval(
+                    boss_bg_x - 25 - glow_size, boss_bg_y - 25 - glow_size,
+                    boss_bg_x + 25 + glow_size, boss_bg_y + 25 + glow_size,
+                    fill='', outline=glow_color, width=3, tags='game_object'
+                )
+                
+                # Attack animation - show visual effects based on current pattern
+                if self.phase2_pattern == 0:  # Chaos Storm
+                    for i in range(4):
+                        angle = i * math.pi / 2 + self.pattern_timer * 0.1
+                        x = boss_bg_x + math.cos(angle) * 15
+                        y = boss_bg_y + math.sin(angle) * 15
+                        self.canvas.create_oval(x-3, y-3, x+3, y+3, 
+                                              fill='orange', outline='', tags='game_object')
+                elif self.phase2_pattern == 1:  # Death Spiral
+                    for i in range(6):
+                        angle = i * math.pi / 3 + self.spiral_angle
+                        x = boss_bg_x + math.cos(angle) * 18
+                        y = boss_bg_y + math.sin(angle) * 18
+                        self.canvas.create_oval(x-2, y-2, x+2, y+2, 
+                                              fill='magenta', outline='', tags='game_object')
+                
+                # Main body (darker when angrier)
+                body_color = 'darkviolet' if self.boss_hp > 2 else 'darkred'
+                self.canvas.create_oval(
+                    boss_bg_x - 20, boss_bg_y - 20,
+                    boss_bg_x + 20, boss_bg_y + 20,
+                    fill=body_color, outline='', tags='game_object'
+                )
+                
+                # Core
+                core_color = 'white' if self.boss_hp > 2 else 'yellow'
+                self.canvas.create_oval(
+                    boss_bg_x - 10, boss_bg_y - 10,
+                    boss_bg_x + 10, boss_bg_y + 10,
+                    fill=core_color, outline=glow_color, width=2, tags='game_object'
+                )
+                
+                # Eyes (angrier expression when HP is low)
+                eye_y_offset = -3 if self.boss_hp > 2 else -5
+                eye_color = 'red' if self.boss_hp > 2 else 'crimson'
+                eye_size = 3 if self.boss_hp > 2 else 4
+                
+                # Left eye
+                self.canvas.create_oval(
+                    boss_bg_x - 6 - eye_size, boss_bg_y + eye_y_offset - eye_size,
+                    boss_bg_x - 6 + eye_size, boss_bg_y + eye_y_offset + eye_size,
+                    fill=eye_color, outline='', tags='game_object'
+                )
+                # Right eye
+                self.canvas.create_oval(
+                    boss_bg_x + 6 - eye_size, boss_bg_y + eye_y_offset - eye_size,
+                    boss_bg_x + 6 + eye_size, boss_bg_y + eye_y_offset + eye_size,
+                    fill=eye_color, outline='', tags='game_object'
+                )
+            
             # Draw player
             if not self.invulnerable or (self.invulnerable and self.invuln_timer % 10 < 5):
+                # Power-up visual effects
+                if self.power_up_active:
+                    if self.power_up_type == 'speed':
+                        # Speed trail
+                        self.canvas.create_oval(
+                            self.player_x - self.PLAYER_SIZE,
+                            self.player_y - self.PLAYER_SIZE,
+                            self.player_x + self.PLAYER_SIZE,
+                            self.player_y + self.PLAYER_SIZE,
+                            fill='', outline='yellow', width=2, tags='game_object'
+                        )
+                    elif self.power_up_type == 'shield':
+                        # Shield bubble
+                        self.canvas.create_oval(
+                            self.player_x - self.PLAYER_SIZE * 1.5,
+                            self.player_y - self.PLAYER_SIZE * 1.5,
+                            self.player_x + self.PLAYER_SIZE * 1.5,
+                            self.player_y + self.PLAYER_SIZE * 1.5,
+                            fill='', outline='cyan', width=2, tags='game_object'
+                        )
+                    elif self.power_up_type == 'slowmo':
+                        # Slow-mo aura
+                        pulse = abs(math.sin(self.pattern_timer * 0.2)) * 3
+                        self.canvas.create_oval(
+                            self.player_x - self.PLAYER_SIZE - pulse,
+                            self.player_y - self.PLAYER_SIZE - pulse,
+                            self.player_x + self.PLAYER_SIZE + pulse,
+                            self.player_y + self.PLAYER_SIZE + pulse,
+                            fill='', outline='magenta', width=2, tags='game_object'
+                        )
+                
+                # Player
                 self.canvas.create_oval(
                     self.player_x - self.PLAYER_SIZE//2,
                     self.player_y - self.PLAYER_SIZE//2,
@@ -546,14 +1141,25 @@ class BulletHellGame:
                     self.player_y + self.PLAYER_SIZE//2,
                     fill='red', outline='white', tags='game_object'
                 )
+            
+            # Draw healing particles
+            for particle in self.healing_particles:
+                alpha = int(255 * (particle['life'] / 30))
+                self.canvas.create_oval(
+                    particle['x'] - 2, particle['y'] - 2,
+                    particle['x'] + 2, particle['y'] + 2,
+                    fill=particle['color'], outline='', tags='game_object'
+                )
         
             # Draw bullets
             for bullet in self.bullets:
-                size = self.BULLET_SIZE
+                size = bullet.get('size', self.BULLET_SIZE)
                 if bullet.get('type') == 'homing':
                     size = self.BULLET_SIZE + 1
                 elif 'life' in bullet and bullet['color'] == 'cyan':
                     size = self.BULLET_SIZE + 2
+                elif bullet.get('type') == 'meteor':
+                    size = 25
                 
                 self.canvas.create_oval(
                     bullet['x'] - size//2,
@@ -562,6 +1168,22 @@ class BulletHellGame:
                     bullet['y'] + size//2,
                     fill=bullet['color'], outline='white', tags='game_object'
                 )
+            
+            # Draw star if active
+            if self.star_active:
+                # Draw pulsing star
+                pulse = math.sin(self.pattern_timer * 0.1) * 2
+                points = []
+                for i in range(10):
+                    angle = i * math.pi / 5
+                    radius = self.STAR_SIZE if i % 2 == 0 else self.STAR_SIZE // 2
+                    radius += pulse
+                    x = self.star_x + math.cos(angle) * radius
+                    y = self.star_y + math.sin(angle) * radius
+                    points.extend([x, y])
+                
+                self.canvas.create_polygon(points, fill='gold', outline='yellow', 
+                                          width=2, tags='game_object')
     
     def game_over(self):
         self.game_running = False
@@ -570,23 +1192,45 @@ class BulletHellGame:
                                font=('Arial', 24, 'bold'))
         self.canvas.create_text(300, 180, text=f"Final Score: {self.score}", 
                                fill='white', font=('Arial', 16))
-        self.canvas.create_text(300, 210, text="You survived all 10 attack patterns!", 
-                               fill='yellow', font=('Arial', 12))
-        self.canvas.create_text(300, 240, text="Patterns: Spiral, Wall, Random, Cross,", 
-                               fill='white', font=('Arial', 10))
-        self.canvas.create_text(300, 255, text="Laser, Homing, Wave, Burst, Ring, Snake", 
-                               fill='white', font=('Arial', 10))
+        
+        if self.phase == 1:
+            self.canvas.create_text(300, 210, text=f"Phase 1: {self.patterns_completed}/10 patterns completed", 
+                                   fill='yellow', font=('Arial', 12))
+        else:
+            self.canvas.create_text(300, 210, text=f"Phase 2: {self.star_collected}/5 stars collected", 
+                                   fill='magenta', font=('Arial', 12))
+        
+        self.canvas.create_text(300, 240, text="Better luck next time!", 
+                               fill='white', font=('Arial', 12))
     
     def game_loop(self):
         if self.in_cutscene:
             self.handle_cutscene()
+        elif self.transitioning_to_phase2:
+            self.handle_phase2_transition()
+        elif self.in_victory:
+            self.handle_victory()
         elif self.game_running:
             self.move_player()
             self.create_bullet_pattern()
             self.update_bullets()
             self.check_collisions()
+            self.check_star_collection()
             self.score += 1
             self.update_ui()
+            
+            # Update healing particles
+            particles_to_remove = []
+            for i, particle in enumerate(self.healing_particles):
+                particle['life'] -= 1
+                particle['x'] += particle['dx']
+                particle['y'] += particle['dy']
+                particle['dy'] += 0.1  # Gravity
+                if particle['life'] <= 0:
+                    particles_to_remove.append(i)
+            
+            for i in reversed(particles_to_remove):
+                del self.healing_particles[i]
         
         self.draw_everything()
         self.root.after(16, self.game_loop)
