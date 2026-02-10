@@ -8,6 +8,7 @@ class BulletDodgingGame:
         self.root = root
         self.root.title("Overstory - The Final Battle")
         self.root.configure(bg='black')
+        self.paused = False
         
         # Game constants
         self.GAME_WIDTH = 600
@@ -201,21 +202,23 @@ class BulletDodgingGame:
         
         self.canvas.create_text(300, 120, text="Game Design & Programming", fill='white', 
                                font=('Arial', 16, 'bold'), tags='credits')
-        self.canvas.create_text(300, 145, text="Your Name Here", fill='cyan', 
+        self.canvas.create_text(300, 145, text="Strenatos :3", fill='cyan', 
                                font=('Arial', 14), tags='credits')
         
         self.canvas.create_text(300, 185, text="Special Thanks To:", fill='yellow', 
                                font=('Arial', 14, 'bold'), tags='credits')
-        self.canvas.create_text(300, 210, text="Python Community", fill='white', 
+        self.canvas.create_text(300, 210, text="sans", fill='white', 
                                font=('Arial', 12), tags='credits')
-        self.canvas.create_text(300, 230, text="All Bullet Dodging Fans", fill='white', 
+        self.canvas.create_text(300, 230, text="John.", fill='white', 
+                               font=('Arial', 12), tags='credits')
+        self.canvas.create_text(300, 250, text="The gang", fill='white', 
                                font=('Arial', 12), tags='credits')
         
-        self.canvas.create_text(300, 270, text="Created with Python & Tkinter", fill='white', 
+        self.canvas.create_text(300, 290, text="Created with Python & Tkinter", fill='white', 
                                font=('Arial', 12), tags='credits')
-        self.canvas.create_text(300, 290, text="A Bullet Dodging Adventure", fill='yellow', 
+        self.canvas.create_text(300, 310, text="A Bullet Dodging Adventure", fill='yellow', 
                                font=('Arial', 12), tags='credits')
-        self.canvas.create_text(300, 310, text="Version 1.0", fill='gray', 
+        self.canvas.create_text(300, 330, text="Version 1.2", fill='gray', 
                                font=('Arial', 10), tags='credits')
         
         # Back button
@@ -304,8 +307,8 @@ class BulletDodgingGame:
             self.canvas.create_rectangle(45, 45, 50 + hp_width, 70, fill='lime', tags='hp_bar')
         
         # HP text
-        self.canvas.create_text(150, 60, text=f"HP: {self.hp}/{self.max_hp}", 
-                               fill='white', font=('Arial', 10), tags='hp_bar')
+        self.canvas.create_text(150, 58, text=f"HP: {self.hp}/{self.max_hp}", 
+                               fill='white', font=('Arial', 10, 'bold'), tags='hp_bar')
         
         # Score
         self.canvas.create_text(400, 60, text=f"Score: {self.score}", 
@@ -353,6 +356,22 @@ class BulletDodgingGame:
     def key_press(self, event):
         self.keys_pressed.add(event.keysym.lower())
         
+        # Press 3 to skip attack
+        if event.keysym == '3':
+            if self.phase == 1 and self.game_running:
+                self.bullets = []
+                self.pattern_type = (self.pattern_type + 1) % 10
+                self.pattern_sub_timer = 0
+                self.patterns_completed += 1
+                if self.patterns_completed >= 10:
+                    self.start_phase2_transition()
+
+            elif self.phase ==2:
+                self.bullets = []
+                self.phase2_pattern = (self.phase2_pattern + 1) % 5
+                self.pattern_sub_timer = 0
+                self.pattern_timer = 0
+
         # Press 4 to skip cutscenes
         if event.keysym == '4':
             if self.in_cutscene:
@@ -362,7 +381,7 @@ class BulletDodgingGame:
             elif self.in_victory:
                 self.skip_victory()
         
-        # Secret code: Press 5 to skip to Phase 2 or skip to victory
+        # Press 5 to skip to Phase 2 or skip to victory
         if event.keysym == '5':
             if self.phase == 1 and self.game_running:
                 self.start_phase2_transition()
@@ -371,6 +390,11 @@ class BulletDodgingGame:
                 self.game_running = False
                 self.in_victory = True
                 self.victory_timer = 0
+
+        # Press Esc or P to pause        
+        if event.keysym == 'Escape' or event.keysym == 'p':
+            if self.game_running:
+                self.paused = not self.paused  # Toggle pause
     
     def key_release(self, event):
         self.keys_pressed.discard(event.keysym.lower())
@@ -895,8 +919,8 @@ class BulletDodgingGame:
             distance = math.sqrt(dx_to_player**2 + dy_to_player**2)
             
             if distance > 0:
-                dx = (dx_to_player / distance) * 2.0
-                dy = (dy_to_player / distance) * 2.0
+                dx = (dx_to_player / distance) * 0.5
+                dy = (dy_to_player / distance) * 0.5
             else:
                 dx, dy = 1, 0
             
@@ -965,7 +989,7 @@ class BulletDodgingGame:
                     })
     
     def homing_pattern(self):
-        if self.pattern_timer % 45 == 0:
+        if self.pattern_timer % 20 == 0:
             edge = random.choice(['top', 'bottom', 'left', 'right'])
             
             if edge == 'top':
@@ -986,14 +1010,15 @@ class BulletDodgingGame:
             distance = math.sqrt(dx_to_player**2 + dy_to_player**2)
             
             if distance > 0:
-                dx = (dx_to_player / distance) * 1.5
-                dy = (dy_to_player / distance) * 1.5
+                dx = (dx_to_player / distance) * 4
+                dy = (dy_to_player / distance) * 4
             else:
                 dx, dy = 1, 0
             
             self.bullets.append({
                 'x': x, 'y': y, 'dx': dx, 'dy': dy, 
-                'color': 'magenta', 'type': 'homing'
+                'color': 'magenta', 'type': 'homing',
+                'life': 200
             })
     
     def wave_pattern(self):
@@ -1110,7 +1135,7 @@ class BulletDodgingGame:
             })
     
     def random_pattern(self):
-        if random.random() < 0.4:
+        if random.random() < 0.55:
             edge = random.choice(['top', 'bottom', 'left', 'right'])
             
             if edge == 'top':
@@ -1135,7 +1160,7 @@ class BulletDodgingGame:
             dy = math.sin(angle) * speed
             
             self.bullets.append({
-                'x': x, 'y': y, 'dx': dx, 'dy': dy, 'color': 'red'
+                'x': x, 'y': y, 'dx': dx, 'dy': dy, 'color': 'red', 'life': 200
             })
     
     def cross_pattern(self):
@@ -1171,14 +1196,14 @@ class BulletDodgingGame:
                 distance = math.sqrt(dx_to_player**2 + dy_to_player**2)
                 
                 if distance > 0:
-                    homing_strength = 0.03
+                    homing_strength = 0.3
                     bullet['dx'] += (dx_to_player / distance) * homing_strength
                     bullet['dy'] += (dy_to_player / distance) * homing_strength
                     
                     speed = math.sqrt(bullet['dx']**2 + bullet['dy']**2)
-                    if speed > 3:
-                        bullet['dx'] = (bullet['dx'] / speed) * 3
-                        bullet['dy'] = (bullet['dy'] / speed) * 3
+                    if speed > 5:
+                        bullet['dx'] = (bullet['dx'] / speed) * 5
+                        bullet['dy'] = (bullet['dy'] / speed) * 5
             
             # Apply slowmo to bullet movement
             bullet['x'] += bullet['dx'] * slowmo_factor
@@ -1484,6 +1509,16 @@ class BulletDodgingGame:
         # Bind the button properly
         self.canvas.tag_bind('menu_button', '<Button-1>', lambda e: self.show_start_menu())
     
+    def draw_pause_menu(self):
+        self.canvas.delete('pause')
+        # Semi-transparent overlay
+        self.canvas.create_rectangle(0, 0, self.GAME_WIDTH, self.GAME_HEIGHT,
+                                    fill='black', stipple='gray50', tags='pause')
+        self.canvas.create_text(300, 200, text="PAUSED", 
+                            fill='yellow', font=('Arial', 36, 'bold'), tags='pause')
+        self.canvas.create_text(300, 250, text="Press ESC or P to resume",
+                            fill='white', font=('Arial', 14), tags='pause')
+    
     def game_loop(self):
         if self.game_state == 'start_menu':
             # Animate menu background
@@ -1497,26 +1532,30 @@ class BulletDodgingGame:
             elif self.in_victory:
                 self.handle_victory()
             elif self.game_running:
-                self.move_player()
-                self.create_bullet_pattern()
-                self.update_bullets()
-                self.check_collisions()
-                self.check_star_collection()
-                self.score += 1
-                self.update_ui()
-                
-                # Update healing particles
-                particles_to_remove = []
-                for i, particle in enumerate(self.healing_particles):
-                    particle['life'] -= 1
-                    particle['x'] += particle['dx']
-                    particle['y'] += particle['dy']
-                    particle['dy'] += 0.1
-                    if particle['life'] <= 0:
-                        particles_to_remove.append(i)
-                
-                for i in reversed(particles_to_remove):
-                    del self.healing_particles[i]
+                if not self.paused:
+                    self.canvas.delete('pause')
+                    self.move_player()
+                    self.create_bullet_pattern()
+                    self.update_bullets()
+                    self.check_collisions()
+                    self.check_star_collection()
+                    self.score += 1
+                    self.update_ui()
+                    
+                    # Update healing particles
+                    particles_to_remove = []
+                    for i, particle in enumerate(self.healing_particles):
+                        particle['life'] -= 1
+                        particle['x'] += particle['dx']
+                        particle['y'] += particle['dy']
+                        particle['dy'] += 0.1
+                        if particle['life'] <= 0:
+                            particles_to_remove.append(i)
+                    
+                    for i in reversed(particles_to_remove):
+                        del self.healing_particles[i]
+                else:
+                    self.draw_pause_menu()
             
             self.draw_everything()
         
