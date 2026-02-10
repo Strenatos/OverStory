@@ -3,10 +3,10 @@ import random
 import math
 import time
 
-class BulletHellGame:
+class BulletDodgingGame:
     def __init__(self, root):
         self.root = root
-        self.root.title("Bullet Hell Game - Phase 2 Enhanced")
+        self.root.title("Overstory - The Final Battle")
         self.root.configure(bg='black')
         
         # Game constants
@@ -27,6 +27,7 @@ class BulletHellGame:
         self.canvas.pack()
         
         # Game state
+        self.game_state = 'start_menu'  # 'start_menu', 'playing', 'game_over', 'victory'
         self.game_running = False
         self.in_cutscene = True
         self.cutscene_timer = 0
@@ -66,11 +67,12 @@ class BulletHellGame:
             "NOOO... THIS CANNOT BE...!",
             "How... how could I... be defeated...",
             "You... You... YOU...",
-            "I WILL BE BACK! YOU HAVEN'T SEEN THE LAST OF ME!"
+            "I'LL BE BACK! YOU HAVEN'T SEEN THE LAST OF ME!"
         ]
         self.victory_dialogue_index = 0
         self.in_victory = False
         self.victory_timer = 0
+        self.player_disappeared = False
         
         self.player_x = 110
         self.player_y = 80
@@ -100,8 +102,9 @@ class BulletHellGame:
         self.targeting_bullets = []
         self.patterns_completed = 0
         
-        # Create UI elements
-        self.create_ui()
+        # Menu background animation
+        self.menu_bullets = []
+        self.menu_animation_timer = 0
         
         # Bind keys
         self.keys_pressed = set()
@@ -109,8 +112,167 @@ class BulletHellGame:
         root.bind('<KeyRelease>', self.key_release)
         root.focus_set()
         
+        # Show start menu
+        self.show_start_menu()
+        
         # Start game loop
         self.game_loop()
+    
+    def show_start_menu(self):
+        self.game_state = 'start_menu'
+        self.canvas.delete('all')
+        
+        # Initialize menu background bullets
+        self.menu_bullets = []
+        self.menu_animation_timer = 0
+        
+        # Title
+        self.canvas.create_text(300, 80, text="OVERSTORY", fill='gold', 
+                               font=('Arial', 36, 'bold'), tags='menu')
+        self.canvas.create_text(300, 120, text="The Final Battle", fill='white', 
+                               font=('Arial', 18), tags='menu')
+        
+        # Play button
+        self.canvas.create_rectangle(200, 160, 400, 210, 
+                                     fill='darkgreen', outline='white', 
+                                     width=3, tags='play_button')
+        self.canvas.create_text(300, 185, text="PLAY", fill='white', 
+                               font=('Arial', 20, 'bold'), tags='play_button')
+        
+        # Settings button
+        self.canvas.create_rectangle(200, 230, 400, 280, 
+                                     fill='darkblue', outline='white', 
+                                     width=3, tags='settings_button')
+        self.canvas.create_text(300, 255, text="SETTINGS", fill='white', 
+                               font=('Arial', 20, 'bold'), tags='settings_button')
+        
+        # Credits button
+        self.canvas.create_rectangle(200, 300, 400, 350, 
+                                     fill='darkred', outline='white', 
+                                     width=3, tags='credits_button')
+        self.canvas.create_text(300, 325, text="CREDITS", fill='white', 
+                               font=('Arial', 20, 'bold'), tags='credits_button')
+        
+        # Bind click events to tags
+        self.canvas.tag_bind('play_button', '<Button-1>', lambda e: self.start_game())
+        self.canvas.tag_bind('settings_button', '<Button-1>', lambda e: self.show_settings())
+        self.canvas.tag_bind('credits_button', '<Button-1>', lambda e: self.show_credits())
+    
+    def show_settings(self):
+        self.canvas.delete('all')
+        
+        self.canvas.create_text(300, 60, text="SETTINGS", fill='cyan', 
+                               font=('Arial', 28, 'bold'), tags='settings')
+        
+        self.canvas.create_text(300, 120, text="Controls:", fill='white', 
+                               font=('Arial', 18, 'bold'), tags='settings')
+        self.canvas.create_text(300, 150, text="WASD or Arrow Keys - Move", fill='white', 
+                               font=('Arial', 14), tags='settings')
+        self.canvas.create_text(300, 175, text="4 - Skip cutscenes", fill='gray', 
+                               font=('Arial', 12), tags='settings')
+        self.canvas.create_text(300, 195, text="5 - Skip to Phase 2 (Debug)", fill='gray', 
+                               font=('Arial', 12), tags='settings')
+        
+        self.canvas.create_text(300, 230, text="Gameplay Tips:", fill='yellow', 
+                               font=('Arial', 16, 'bold'), tags='settings')
+        self.canvas.create_text(300, 255, text="• Collect golden stars to damage the boss", fill='white', 
+                               font=('Arial', 12), tags='settings')
+        self.canvas.create_text(300, 275, text="• Stars heal you and grant random power-ups", fill='white', 
+                               font=('Arial', 12), tags='settings')
+        self.canvas.create_text(300, 295, text="• Survive 10 patterns in Phase 1", fill='cyan', 
+                               font=('Arial', 12), tags='settings')
+        self.canvas.create_text(300, 315, text="• Defeat the boss in Phase 2 by collecting 5 stars", fill='magenta', 
+                               font=('Arial', 12), tags='settings')
+        
+        # Back button
+        self.canvas.create_rectangle(200, 340, 400, 380, 
+                                     fill='darkgreen', outline='white', 
+                                     width=3, tags='back_button')
+        self.canvas.create_text(300, 360, text="BACK", fill='white', 
+                               font=('Arial', 20, 'bold'), tags='back_button')
+        
+        self.canvas.tag_bind('back_button', '<Button-1>', lambda e: self.show_start_menu())
+    
+    def show_credits(self):
+        self.canvas.delete('all')
+        
+        self.canvas.create_text(300, 60, text="CREDITS", fill='gold', 
+                               font=('Arial', 28, 'bold'), tags='credits')
+        
+        self.canvas.create_text(300, 120, text="Game Design & Programming", fill='white', 
+                               font=('Arial', 16, 'bold'), tags='credits')
+        self.canvas.create_text(300, 145, text="Your Name Here", fill='cyan', 
+                               font=('Arial', 14), tags='credits')
+        
+        self.canvas.create_text(300, 185, text="Special Thanks To:", fill='yellow', 
+                               font=('Arial', 14, 'bold'), tags='credits')
+        self.canvas.create_text(300, 210, text="Python Community", fill='white', 
+                               font=('Arial', 12), tags='credits')
+        self.canvas.create_text(300, 230, text="All Bullet Dodging Fans", fill='white', 
+                               font=('Arial', 12), tags='credits')
+        
+        self.canvas.create_text(300, 270, text="Created with Python & Tkinter", fill='white', 
+                               font=('Arial', 12), tags='credits')
+        self.canvas.create_text(300, 290, text="A Bullet Dodging Adventure", fill='yellow', 
+                               font=('Arial', 12), tags='credits')
+        self.canvas.create_text(300, 310, text="Version 1.0", fill='gray', 
+                               font=('Arial', 10), tags='credits')
+        
+        # Back button
+        self.canvas.create_rectangle(200, 340, 400, 380, 
+                                     fill='darkgreen', outline='white', 
+                                     width=3, tags='back_button')
+        self.canvas.create_text(300, 360, text="BACK", fill='white', 
+                               font=('Arial', 20, 'bold'), tags='back_button')
+        
+        self.canvas.tag_bind('back_button', '<Button-1>', lambda e: self.show_start_menu())
+    
+    def start_game(self):
+        # Reset game state
+        self.game_state = 'playing'
+        self.game_running = False
+        self.in_cutscene = True
+        self.cutscene_timer = 0
+        self.figure_x = self.GAME_WIDTH // 2
+        self.figure_y = self.GAME_HEIGHT // 2
+        self.dialogue_index = 0
+        self.phase = 1
+        self.phase2_pattern = 0
+        self.boss_hp = 5
+        self.star_active = False
+        self.star_collected = 0
+        self.phase2_dialogue_index = 0
+        self.transitioning_to_phase2 = False
+        self.phase2_transition_timer = 0
+        self.victory_dialogue_index = 0
+        self.in_victory = False
+        self.victory_timer = 0
+        self.player_disappeared = False
+        
+        # Spawn player in bottom left of battle box
+        self.player_x = self.battle_box_x + 20
+        self.player_y = self.battle_box_y + self.BATTLE_BOX_HEIGHT - 20
+        self.bullets = []
+        self.score = 0
+        self.hp = 20
+        self.invulnerable = False
+        self.invuln_timer = 0
+        
+        self.healing_particles = []
+        self.power_up_active = False
+        self.power_up_timer = 0
+        self.power_up_type = None
+        
+        self.pattern_timer = 0
+        self.pattern_type = 0
+        self.pattern_sub_timer = 0
+        self.wave_offset = 0
+        self.spiral_angle = 0
+        self.patterns_completed = 0
+        
+        # Clear canvas and create UI
+        self.canvas.delete('all')
+        self.create_ui()
     
     def create_ui(self):
         # Draw battle box
@@ -122,7 +284,7 @@ class BulletHellGame:
         )
         
         # HP bar background
-        self.canvas.create_rectangle(50, 50, 250, 70, fill='red', tags='ui')
+        self.canvas.create_rectangle(45, 45, 250, 70, fill='red', tags='ui')
         
         # Instructions
         self.canvas.create_text(self.GAME_WIDTH//2, 15, text="WASD/Arrows to move • Survive! • Stars heal you!", 
@@ -139,7 +301,7 @@ class BulletHellGame:
         # HP bar (green portion)
         hp_width = int(200 * (self.hp / self.max_hp))
         if hp_width > 0:
-            self.canvas.create_rectangle(50, 50, 50 + hp_width, 70, fill='lime', tags='hp_bar')
+            self.canvas.create_rectangle(45, 45, 50 + hp_width, 70, fill='lime', tags='hp_bar')
         
         # HP text
         self.canvas.create_text(150, 60, text=f"HP: {self.hp}/{self.max_hp}", 
@@ -169,34 +331,68 @@ class BulletHellGame:
         # Phase indicator
         if self.phase == 1:
             pattern_names = ["Spiral", "Wall", "Random", "Cross", "Laser", "Homing", "Wave", "Burst", "Ring", "Snake"]
-            self.canvas.create_text(500, 80, text=f"Pattern: {pattern_names[self.pattern_type]}", 
+            self.canvas.create_text(550, 30, text=f"Pattern: {pattern_names[self.pattern_type]}", 
                                    fill='yellow', font=('Arial', 10), tags='pattern_text')
-            self.canvas.create_text(500, 95, text=f"Phase 1 ({self.patterns_completed}/10)", 
+            self.canvas.create_text(550, 45, text=f"Phase 1 ({self.patterns_completed}/10)", 
                                    fill='cyan', font=('Arial', 9), tags='phase_text')
         else:
             # Phase 2 - Boss HP bar
             boss_hp_width = int(300 * (self.boss_hp / self.boss_max_hp))
-            self.canvas.create_rectangle(150, 35, 450, 50, fill='darkred', outline='white', width=2, tags='boss_hp_bar')
+            self.canvas.create_rectangle(150, 25, 450, 50, fill='darkred', outline='white', width=2, tags='boss_hp_bar')
             if boss_hp_width > 0:
-                self.canvas.create_rectangle(150, 35, 150 + boss_hp_width, 50, fill='red', tags='boss_hp_bar')
-            self.canvas.create_text(300, 42, text=f"BOSS HP: {self.boss_hp}/{self.boss_max_hp}", 
+                self.canvas.create_rectangle(150, 25, 150 + boss_hp_width, 50, fill='red', tags='boss_hp_bar')
+            self.canvas.create_text(300, 37, text=f"BOSS HP: {self.boss_hp}/{self.boss_max_hp}", 
                                    fill='white', font=('Arial', 10, 'bold'), tags='boss_hp_bar')
             
             phase2_names = ["Chaos Storm", "Death Spiral", "Void Prison", "Meteor Rain", "Final Judgement"]
-            self.canvas.create_text(500, 80, text=f"Attack: {phase2_names[self.phase2_pattern]}", 
+            self.canvas.create_text(525, 30, text=f"Attack: {phase2_names[self.phase2_pattern]}", 
                                    fill='red', font=('Arial', 10, 'bold'), tags='pattern_text')
-            self.canvas.create_text(500, 95, text=f"PHASE 2 ({self.star_collected}/5)", 
+            self.canvas.create_text(550, 45, text=f"PHASE 2 ({self.star_collected}/5)", 
                                    fill='magenta', font=('Arial', 9, 'bold'), tags='phase_text')
     
     def key_press(self, event):
         self.keys_pressed.add(event.keysym.lower())
         
-        # Secret code: Press 5 to skip to Phase 2
-        if event.keysym == '5' and self.phase == 1 and self.game_running:
-            self.start_phase2_transition()
+        # Press 4 to skip cutscenes
+        if event.keysym == '4':
+            if self.in_cutscene:
+                self.skip_cutscene()
+            elif self.transitioning_to_phase2:
+                self.skip_phase2_transition()
+            elif self.in_victory:
+                self.skip_victory()
+        
+        # Secret code: Press 5 to skip to Phase 2 or skip to victory
+        if event.keysym == '5':
+            if self.phase == 1 and self.game_running:
+                self.start_phase2_transition()
+            elif self.phase == 2 and self.game_running:
+                # Skip to victory
+                self.game_running = False
+                self.in_victory = True
+                self.victory_timer = 0
     
     def key_release(self, event):
         self.keys_pressed.discard(event.keysym.lower())
+    
+    def skip_cutscene(self):
+        """Skip the opening cutscene"""
+        self.in_cutscene = False
+        self.game_running = True
+        self.canvas.delete('dialogue')
+        self.canvas.delete('figure')
+        self.canvas.itemconfig(self.battle_box, outline='white')
+    
+    def skip_phase2_transition(self):
+        """Skip the Phase 2 transition dialogue"""
+        self.transitioning_to_phase2 = False
+        self.game_running = True
+        self.canvas.delete('dialogue')
+        self.canvas.itemconfig(self.battle_box, outline='white')
+    
+    def skip_victory(self):
+        """Skip the victory dialogue and go straight to victory screen"""
+        self.show_victory_screen()
     
     def move_player(self):
         dx, dy = 0, 0
@@ -254,7 +450,7 @@ class BulletHellGame:
             )
             
             # Advance dialogue every 2 seconds
-            if self.cutscene_timer % 110 == 0:
+            if self.cutscene_timer % 100 == 0:
                 self.dialogue_index += 1
                 
         # Move figure to top after dialogue is complete
@@ -287,7 +483,7 @@ class BulletHellGame:
             self.canvas.delete('dialogue')
             # Create text box background for better readability
             text = self.phase2_dialogue[self.phase2_dialogue_index]
-            self.canvas.create_rectangle(50, self.GAME_HEIGHT - 90, 550, self.GAME_HEIGHT - 50,
+            self.canvas.create_rectangle(50, self.GAME_HEIGHT - 90, 550, self.GAME_HEIGHT - 49,
                                         fill='black', outline='red', width=2, tags='dialogue')
             self.canvas.create_text(
                 self.GAME_WIDTH // 2, self.GAME_HEIGHT - 70,
@@ -311,6 +507,7 @@ class BulletHellGame:
         # Clear bullets
         if self.victory_timer == 1:
             self.bullets = []
+            self.player_disappeared = True  # Make player disappear
         
         # Victory flash
         if self.victory_timer % 30 < 15:
@@ -322,7 +519,7 @@ class BulletHellGame:
         if self.victory_dialogue_index < len(self.victory_dialogue):
             self.canvas.delete('dialogue')
             text = self.victory_dialogue[self.victory_dialogue_index]
-            self.canvas.create_rectangle(50, self.GAME_HEIGHT - 90, 550, self.GAME_HEIGHT - 50,
+            self.canvas.create_rectangle(50, self.GAME_HEIGHT - 90, 550, self.GAME_HEIGHT - 49,
                                         fill='black', outline='gold', width=2, tags='dialogue')
             self.canvas.create_text(
                 self.GAME_WIDTH // 2, self.GAME_HEIGHT - 70,
@@ -340,19 +537,86 @@ class BulletHellGame:
     def show_victory_screen(self):
         self.game_running = False
         self.in_victory = False
-        self.canvas.create_rectangle(80, 100, 520, 300, fill='black', outline='gold', width=4)
-        self.canvas.create_text(300, 130, text="VICTORY!", fill='gold', 
-                               font=('Arial', 32, 'bold'))
-        self.canvas.create_text(300, 170, text=f"Final Score: {self.score}", 
-                               fill='white', font=('Arial', 18))
-        self.canvas.create_text(300, 200, text="You have defeated the boss!", 
-                               fill='yellow', font=('Arial', 14))
-        self.canvas.create_text(300, 230, text="Phase 1: All 10 patterns survived", 
-                               fill='cyan', font=('Arial', 11))
-        self.canvas.create_text(300, 250, text="Phase 2: All 5 ultimate attacks defeated", 
-                               fill='magenta', font=('Arial', 11))
-        self.canvas.create_text(300, 275, text="You are the true champion!", 
-                               fill='gold', font=('Arial', 12, 'bold'))
+        self.game_state = 'victory'
+        self.canvas.delete('all')
+        
+        self.canvas.create_rectangle(80, 80, 520, 320, fill='black', outline='gold', width=4, tags='victory')
+        self.canvas.create_text(300, 120, text="VICTORY!", fill='gold', 
+                               font=('Arial', 32, 'bold'), tags='victory')
+        self.canvas.create_text(300, 160, text=f"Final Score: {self.score}", 
+                               fill='white', font=('Arial', 18), tags='victory')
+        self.canvas.create_text(300, 190, text="You have defeated the boss!", 
+                               fill='yellow', font=('Arial', 14), tags='victory')
+        self.canvas.create_text(300, 220, text="Phase 1: All 10 patterns survived", 
+                               fill='cyan', font=('Arial', 11), tags='victory')
+        self.canvas.create_text(300, 240, text="Phase 2: All 5 ultimate attacks defeated", 
+                               fill='magenta', font=('Arial', 11), tags='victory')
+        self.canvas.create_text(300, 265, text="You are the true champion!", 
+                               fill='gold', font=('Arial', 12, 'bold'), tags='victory')
+        
+        # Return to menu button
+        self.canvas.create_rectangle(200, 280, 400, 310, 
+                                     fill='darkgreen', outline='white', 
+                                     width=2, tags='menu_button')
+        self.canvas.create_text(300, 295, text="RETURN TO MENU", fill='white', 
+                               font=('Arial', 12, 'bold'), tags='menu_button')
+        
+        # Bind the button properly
+        self.canvas.tag_bind('menu_button', '<Button-1>', lambda e: self.show_start_menu())
+    
+    
+    def update_menu_background(self):
+        """Create spiral bullet pattern in background of menu"""
+        self.menu_animation_timer += 1
+        
+        # Create spiral pattern bullets
+        if self.menu_animation_timer % 12 == 0:
+            center_x = self.GAME_WIDTH // 2
+            center_y = self.GAME_HEIGHT // 2
+            
+            for i in range(6):
+                angle = (self.spiral_angle + i * math.pi / 3) % (2 * math.pi)
+                speed = 1.2
+                
+                self.menu_bullets.append({
+                    'x': center_x,
+                    'y': center_y,
+                    'dx': math.cos(angle) * speed,
+                    'dy': math.sin(angle) * speed,
+                    'color': random.choice(['red', 'purple', 'white']),
+                    'alpha': 0.5  # Semi-transparent effect
+                })
+            self.spiral_angle += 0.1
+        
+        # Update menu bullet positions
+        bullets_to_remove = []
+        for i, bullet in enumerate(self.menu_bullets):
+            bullet['x'] += bullet['dx']
+            bullet['y'] += bullet['dy']
+            
+            # Remove bullets that go off screen
+            if (bullet['x'] < -20 or bullet['x'] > self.GAME_WIDTH + 20 or
+                bullet['y'] < -20 or bullet['y'] > self.GAME_HEIGHT + 20):
+                bullets_to_remove.append(i)
+        
+        for i in reversed(bullets_to_remove):
+            del self.menu_bullets[i]
+    
+    def draw_menu_background(self):
+        """Draw the background bullets on menu"""
+        self.canvas.delete('menu_bg')
+        
+        for bullet in self.menu_bullets:
+            self.canvas.create_oval(
+                bullet['x'] - 3,
+                bullet['y'] - 3,
+                bullet['x'] + 3,
+                bullet['y'] + 3,
+                fill=bullet['color'], outline='', tags='menu_bg'
+            )
+        
+        # Lower the menu_bg layer so it's behind the menu
+        self.canvas.tag_lower('menu_bg')
     
     def create_bullet_pattern(self):
         self.pattern_timer += 1
@@ -442,36 +706,40 @@ class BulletHellGame:
             self.boss_hp -= 1
             self.score += 500
             
-            # Heal player by 3 HP (but don't exceed max HP)
-            old_hp = self.hp
-            self.hp = min(self.hp + 3, self.max_hp)
-            
-            # Create healing particles
-            if self.hp > old_hp:
-                for _ in range(15):
-                    angle = random.uniform(0, 2 * math.pi)
-                    speed = random.uniform(1, 3)
-                    self.healing_particles.append({
-                        'x': self.player_x,
-                        'y': self.player_y,
-                        'dx': math.cos(angle) * speed,
-                        'dy': math.sin(angle) * speed,
-                        'life': 30,
-                        'color': 'lime'
-                    })
-            
-            # Random power-up!
-            power_ups = ['speed', 'shield', 'slowmo']
-            self.power_up_type = random.choice(power_ups)
-            self.power_up_active = True
-            self.power_up_timer = 180  # 3 seconds at 60fps
-            
+            # Check if this is the final star (boss defeated)
             if self.boss_hp <= 0:
+                # Don't give power-up on final star
+                # Don't heal on final star
                 # Victory!
                 self.game_running = False
                 self.in_victory = True
                 self.victory_timer = 0
             else:
+                # Not the final star - give rewards
+                # Heal player by 3 HP (but don't exceed max HP)
+                old_hp = self.hp
+                self.hp = min(self.hp + 3, self.max_hp)
+                
+                # Create healing particles
+                if self.hp > old_hp:
+                    for _ in range(15):
+                        angle = random.uniform(0, 2 * math.pi)
+                        speed = random.uniform(1, 3)
+                        self.healing_particles.append({
+                            'x': self.player_x,
+                            'y': self.player_y,
+                            'dx': math.cos(angle) * speed,
+                            'dy': math.sin(angle) * speed,
+                            'life': 30,
+                            'color': 'lime'
+                        })
+                
+                # Random power-up!
+                power_ups = ['speed', 'shield', 'slowmo']
+                self.power_up_type = random.choice(power_ups)
+                self.power_up_active = True
+                self.power_up_timer = 180  # 3 seconds at 60fps
+                
                 # Next attack
                 self.phase2_pattern = (self.phase2_pattern + 1) % 5
                 self.pattern_sub_timer = 0
@@ -480,8 +748,8 @@ class BulletHellGame:
     # Phase 2 Attack Patterns (HARDER)
     def chaos_storm_pattern(self):
         # Massive random bullet spam from all directions (NERFED)
-        if self.pattern_timer % 6 == 0:  # Reduced from every 5 frames to every 8
-            for _ in range(2):  # Reduced from 3 bullets to 2
+        if self.pattern_timer % 4 == 0:
+            for _ in range(2):
                 edge = random.choice(['top', 'bottom', 'left', 'right'])
                 
                 if edge == 'top':
@@ -501,25 +769,25 @@ class BulletHellGame:
                     y = random.randint(self.battle_box_y, self.battle_box_y + self.BATTLE_BOX_HEIGHT)
                     angle = random.uniform(2*math.pi/3, 4*math.pi/3)
                 
-                speed = random.uniform(2.0, 3.0)  # Reduced from 2.5-4.0
+                speed = random.uniform(2.0, 3.0)
                 self.bullets.append({
                     'x': x, 'y': y,
                     'dx': math.cos(angle) * speed,
                     'dy': math.sin(angle) * speed,
-                    'color': random.choice(['red', 'orange', 'yellow']),
-                    'size': 10  # Bigger bullets!
+                    'color': random.choice(['red', 'red', 'red']),
+                    'size': 10
                 })
     
     def death_spiral_pattern(self):
         # Multiple fast spirals from center (NERFED)
-        if self.pattern_timer % 8 == 0:  # Reduced from every 8 frames to every 12
+        if self.pattern_timer % 8 == 0:
             center_x = self.GAME_WIDTH // 2
             center_y = self.GAME_HEIGHT // 2
             
-            for spiral in range(4):  # Reduced from 3 spirals to 2
-                for i in range(8):  # Reduced from 8 bullets to 6
+            for spiral in range(4):
+                for i in range(8):
                     angle = (self.spiral_angle + i * math.pi / 3 + spiral * math.pi) % (2 * math.pi)
-                    speed = 2.0 + math.sin(self.pattern_timer * 0.03) * 0.5  # Reduced from 2.5
+                    speed = 2.0 + math.sin(self.pattern_timer * 0.03) * 0.5
                     
                     self.bullets.append({
                         'x': center_x,
@@ -532,13 +800,13 @@ class BulletHellGame:
     
     def void_prison_pattern(self):
         # Bullets from edges moving to center, creating a cage (BUFFED)
-        if self.pattern_timer % 8 == 0:  # Increased spawn rate from every 12 frames to 8
+        if self.pattern_timer % 8 == 0:
             center_x = self.GAME_WIDTH // 2
             center_y = self.GAME_HEIGHT // 2
             
             # From all four sides (spawn 2 bullets per side now)
             for i in range(4):
-                for offset in [0, self.BATTLE_BOX_WIDTH // 4]:  # Spawn 2 bullets per side
+                for offset in [0, self.BATTLE_BOX_WIDTH // 4]:
                     if i == 0:  # Top
                         x = self.battle_box_x + (self.pattern_sub_timer * 10 + offset) % self.BATTLE_BOX_WIDTH
                         y = self.battle_box_y
@@ -584,7 +852,7 @@ class BulletHellGame:
                 'dx': dx, 'dy': dy,
                 'color': 'orange',
                 'type': 'meteor',
-                'size': 50  # MASSIVE meteors!
+                'size': 50
             })
     
     def final_judgement_pattern(self):
@@ -938,7 +1206,6 @@ class BulletHellGame:
         
         # Shield power-up blocks one hit
         if self.power_up_active and self.power_up_type == 'shield':
-            # Check for collision but don't take damage - just disable shield
             player_rect = (self.player_x - self.PLAYER_SIZE//2, 
                           self.player_y - self.PLAYER_SIZE//2,
                           self.player_x + self.PLAYER_SIZE//2, 
@@ -953,7 +1220,6 @@ class BulletHellGame:
                 
                 if (player_rect[0] < bullet_rect[2] and player_rect[2] > bullet_rect[0] and
                     player_rect[1] < bullet_rect[3] and player_rect[3] > bullet_rect[1]):
-                    # Shield absorbed the hit!
                     self.power_up_active = False
                     self.power_up_type = None
                     self.invulnerable = True
@@ -988,17 +1254,23 @@ class BulletHellGame:
         self.canvas.delete('game_object')
         
         if self.in_cutscene:
-            # Draw mysterious boss figure with better appearance
+            # Draw mysterious boss figure with better appearance and flashing
             self.boss_glow += 0.1
             glow_size = 5 + abs(math.sin(self.boss_glow) * 3)
             
-            # Outer glow
+            # Flash effect for outline
+            if int(self.cutscene_timer / 15) % 2 == 0:
+                outline_color = 'purple'
+            else:
+                outline_color = 'magenta'
+            
+            # Outer glow (flashing)
             self.canvas.create_oval(
                 self.figure_x - self.boss_size - glow_size, 
                 self.figure_y - self.boss_size - glow_size,
                 self.figure_x + self.boss_size + glow_size, 
                 self.figure_y + self.boss_size + glow_size,
-                fill='', outline='purple', width=2, tags='figure'
+                fill='', outline=outline_color, width=2, tags='figure'
             )
             # Middle layer
             self.canvas.create_oval(
@@ -1008,25 +1280,27 @@ class BulletHellGame:
                 self.figure_y + self.boss_size - 5,
                 fill='darkviolet', outline='', tags='figure'
             )
-            # Core
+            # Core (also flashes)
+            core_color = 'white' if int(self.cutscene_timer / 20) % 2 == 0 else 'light grey'
             self.canvas.create_oval(
                 self.figure_x - self.boss_size // 2, 
                 self.figure_y - self.boss_size // 2,
                 self.figure_x + self.boss_size // 2, 
                 self.figure_y + self.boss_size // 2,
-                fill='white', outline='purple', width=2, tags='figure'
+                fill=core_color, outline=outline_color, width=2, tags='figure'
             )
-            # Eyes
+            # Eyes (glow red)
             eye_offset = 8
+            eye_color = 'red' if int(self.cutscene_timer / 10) % 2 == 0 else 'crimson'
             self.canvas.create_oval(
                 self.figure_x - eye_offset - 3, self.figure_y - 5,
                 self.figure_x - eye_offset + 3, self.figure_y + 1,
-                fill='red', outline='', tags='figure'
+                fill=eye_color, outline='', tags='figure'
             )
             self.canvas.create_oval(
                 self.figure_x + eye_offset - 3, self.figure_y - 5,
                 self.figure_x + eye_offset + 3, self.figure_y + 1,
-                fill='red', outline='', tags='figure'
+                fill=eye_color, outline='', tags='figure'
             )
             self.canvas.itemconfig(self.battle_box, outline='grey')
         else:
@@ -1050,15 +1324,15 @@ class BulletHellGame:
                     fill='', outline=glow_color, width=3, tags='game_object'
                 )
                 
-                # Attack animation - show visual effects based on current pattern
-                if self.phase2_pattern == 0:  # Chaos Storm
+                # Attack animation
+                if self.phase2_pattern == 0:
                     for i in range(4):
                         angle = i * math.pi / 2 + self.pattern_timer * 0.1
                         x = boss_bg_x + math.cos(angle) * 15
                         y = boss_bg_y + math.sin(angle) * 15
                         self.canvas.create_oval(x-3, y-3, x+3, y+3, 
                                               fill='orange', outline='', tags='game_object')
-                elif self.phase2_pattern == 1:  # Death Spiral
+                elif self.phase2_pattern == 1:
                     for i in range(6):
                         angle = i * math.pi / 3 + self.spiral_angle
                         x = boss_bg_x + math.cos(angle) * 18
@@ -1066,7 +1340,7 @@ class BulletHellGame:
                         self.canvas.create_oval(x-2, y-2, x+2, y+2, 
                                               fill='magenta', outline='', tags='game_object')
                 
-                # Main body (darker when angrier)
+                # Main body
                 body_color = 'darkviolet' if self.boss_hp > 2 else 'darkred'
                 self.canvas.create_oval(
                     boss_bg_x - 20, boss_bg_y - 20,
@@ -1075,76 +1349,71 @@ class BulletHellGame:
                 )
                 
                 # Core
-                core_color = 'white' if self.boss_hp > 2 else 'yellow'
+                core_color = 'white' if self.boss_hp > 2 else 'white'
                 self.canvas.create_oval(
                     boss_bg_x - 10, boss_bg_y - 10,
                     boss_bg_x + 10, boss_bg_y + 10,
                     fill=core_color, outline=glow_color, width=2, tags='game_object'
                 )
                 
-                # Eyes (angrier expression when HP is low)
+                # Eyes
                 eye_y_offset = -3 if self.boss_hp > 2 else -5
                 eye_color = 'red' if self.boss_hp > 2 else 'crimson'
                 eye_size = 3 if self.boss_hp > 2 else 4
                 
-                # Left eye
                 self.canvas.create_oval(
                     boss_bg_x - 6 - eye_size, boss_bg_y + eye_y_offset - eye_size,
                     boss_bg_x - 6 + eye_size, boss_bg_y + eye_y_offset + eye_size,
                     fill=eye_color, outline='', tags='game_object'
                 )
-                # Right eye
                 self.canvas.create_oval(
                     boss_bg_x + 6 - eye_size, boss_bg_y + eye_y_offset - eye_size,
                     boss_bg_x + 6 + eye_size, boss_bg_y + eye_y_offset + eye_size,
                     fill=eye_color, outline='', tags='game_object'
                 )
             
-            # Draw player
-            if not self.invulnerable or (self.invulnerable and self.invuln_timer % 10 < 5):
-                # Power-up visual effects
-                if self.power_up_active:
-                    if self.power_up_type == 'speed':
-                        # Speed trail
-                        self.canvas.create_oval(
-                            self.player_x - self.PLAYER_SIZE,
-                            self.player_y - self.PLAYER_SIZE,
-                            self.player_x + self.PLAYER_SIZE,
-                            self.player_y + self.PLAYER_SIZE,
-                            fill='', outline='yellow', width=2, tags='game_object'
-                        )
-                    elif self.power_up_type == 'shield':
-                        # Shield bubble
-                        self.canvas.create_oval(
-                            self.player_x - self.PLAYER_SIZE * 1.5,
-                            self.player_y - self.PLAYER_SIZE * 1.5,
-                            self.player_x + self.PLAYER_SIZE * 1.5,
-                            self.player_y + self.PLAYER_SIZE * 1.5,
-                            fill='', outline='cyan', width=2, tags='game_object'
-                        )
-                    elif self.power_up_type == 'slowmo':
-                        # Slow-mo aura
-                        pulse = abs(math.sin(self.pattern_timer * 0.2)) * 3
-                        self.canvas.create_oval(
-                            self.player_x - self.PLAYER_SIZE - pulse,
-                            self.player_y - self.PLAYER_SIZE - pulse,
-                            self.player_x + self.PLAYER_SIZE + pulse,
-                            self.player_y + self.PLAYER_SIZE + pulse,
-                            fill='', outline='magenta', width=2, tags='game_object'
-                        )
-                
-                # Player
-                self.canvas.create_oval(
-                    self.player_x - self.PLAYER_SIZE//2,
-                    self.player_y - self.PLAYER_SIZE//2,
-                    self.player_x + self.PLAYER_SIZE//2,
-                    self.player_y + self.PLAYER_SIZE//2,
-                    fill='red', outline='white', tags='game_object'
-                )
+            # Draw player (unless they've disappeared after victory)
+            if not self.player_disappeared:
+                if not self.invulnerable or (self.invulnerable and self.invuln_timer % 10 < 5):
+                    # Power-up visual effects
+                    if self.power_up_active:
+                        if self.power_up_type == 'speed':
+                            self.canvas.create_oval(
+                                self.player_x - self.PLAYER_SIZE,
+                                self.player_y - self.PLAYER_SIZE,
+                                self.player_x + self.PLAYER_SIZE,
+                                self.player_y + self.PLAYER_SIZE,
+                                fill='', outline='yellow', width=2, tags='game_object'
+                            )
+                        elif self.power_up_type == 'shield':
+                            self.canvas.create_oval(
+                                self.player_x - self.PLAYER_SIZE * 1.5,
+                                self.player_y - self.PLAYER_SIZE * 1.5,
+                                self.player_x + self.PLAYER_SIZE * 1.5,
+                                self.player_y + self.PLAYER_SIZE * 1.5,
+                                fill='', outline='cyan', width=2, tags='game_object'
+                            )
+                        elif self.power_up_type == 'slowmo':
+                            pulse = abs(math.sin(self.pattern_timer * 0.2)) * 3
+                            self.canvas.create_oval(
+                                self.player_x - self.PLAYER_SIZE - pulse,
+                                self.player_y - self.PLAYER_SIZE - pulse,
+                                self.player_x + self.PLAYER_SIZE + pulse,
+                                self.player_y + self.PLAYER_SIZE + pulse,
+                                fill='', outline='magenta', width=2, tags='game_object'
+                            )
+                    
+                    # Player
+                    self.canvas.create_oval(
+                        self.player_x - self.PLAYER_SIZE//2,
+                        self.player_y - self.PLAYER_SIZE//2,
+                        self.player_x + self.PLAYER_SIZE//2,
+                        self.player_y + self.PLAYER_SIZE//2,
+                        fill='red', outline='white', tags='game_object'
+                    )
             
             # Draw healing particles
             for particle in self.healing_particles:
-                alpha = int(255 * (particle['life'] / 30))
                 self.canvas.create_oval(
                     particle['x'] - 2, particle['y'] - 2,
                     particle['x'] + 2, particle['y'] + 2,
@@ -1171,7 +1440,6 @@ class BulletHellGame:
             
             # Draw star if active
             if self.star_active:
-                # Draw pulsing star
                 pulse = math.sin(self.pattern_timer * 0.1) * 2
                 points = []
                 for i in range(10):
@@ -1187,55 +1455,74 @@ class BulletHellGame:
     
     def game_over(self):
         self.game_running = False
-        self.canvas.create_rectangle(100, 120, 500, 280, fill='black', outline='white', width=3)
-        self.canvas.create_text(300, 150, text="GAME OVER", fill='red', 
-                               font=('Arial', 24, 'bold'))
-        self.canvas.create_text(300, 180, text=f"Final Score: {self.score}", 
-                               fill='white', font=('Arial', 16))
+        self.game_state = 'game_over'
+        self.canvas.delete('all')
+        
+        self.canvas.create_rectangle(100, 100, 500, 300, fill='black', outline='white', width=3, tags='gameover')
+        self.canvas.create_text(300, 140, text="GAME OVER", fill='red', 
+                               font=('Arial', 24, 'bold'), tags='gameover')
+        self.canvas.create_text(300, 175, text=f"Final Score: {self.score}", 
+                               fill='white', font=('Arial', 16), tags='gameover')
         
         if self.phase == 1:
-            self.canvas.create_text(300, 210, text=f"Phase 1: {self.patterns_completed}/10 patterns completed", 
-                                   fill='yellow', font=('Arial', 12))
+            self.canvas.create_text(300, 205, text=f"Phase 1: {self.patterns_completed}/10 patterns completed", 
+                                   fill='yellow', font=('Arial', 12), tags='gameover')
         else:
-            self.canvas.create_text(300, 210, text=f"Phase 2: {self.star_collected}/5 stars collected", 
-                                   fill='magenta', font=('Arial', 12))
+            self.canvas.create_text(300, 205, text=f"Phase 2: {self.star_collected}/5 stars collected", 
+                                   fill='magenta', font=('Arial', 12), tags='gameover')
         
-        self.canvas.create_text(300, 240, text="Better luck next time!", 
-                               fill='white', font=('Arial', 12))
+        self.canvas.create_text(300, 235, text="Better luck next time!", 
+                               fill='white', font=('Arial', 12), tags='gameover')
+        
+        # Return to menu button
+        self.canvas.create_rectangle(200, 260, 400, 290, 
+                                     fill='darkgreen', outline='white', 
+                                     width=2, tags='menu_button')
+        self.canvas.create_text(300, 275, text="RETURN TO MENU", fill='white', 
+                               font=('Arial', 12, 'bold'), tags='menu_button')
+        
+        # Bind the button properly
+        self.canvas.tag_bind('menu_button', '<Button-1>', lambda e: self.show_start_menu())
     
     def game_loop(self):
-        if self.in_cutscene:
-            self.handle_cutscene()
-        elif self.transitioning_to_phase2:
-            self.handle_phase2_transition()
-        elif self.in_victory:
-            self.handle_victory()
-        elif self.game_running:
-            self.move_player()
-            self.create_bullet_pattern()
-            self.update_bullets()
-            self.check_collisions()
-            self.check_star_collection()
-            self.score += 1
-            self.update_ui()
+        if self.game_state == 'start_menu':
+            # Animate menu background
+            self.update_menu_background()
+            self.draw_menu_background()
+        elif self.game_state == 'playing':
+            if self.in_cutscene:
+                self.handle_cutscene()
+            elif self.transitioning_to_phase2:
+                self.handle_phase2_transition()
+            elif self.in_victory:
+                self.handle_victory()
+            elif self.game_running:
+                self.move_player()
+                self.create_bullet_pattern()
+                self.update_bullets()
+                self.check_collisions()
+                self.check_star_collection()
+                self.score += 1
+                self.update_ui()
+                
+                # Update healing particles
+                particles_to_remove = []
+                for i, particle in enumerate(self.healing_particles):
+                    particle['life'] -= 1
+                    particle['x'] += particle['dx']
+                    particle['y'] += particle['dy']
+                    particle['dy'] += 0.1
+                    if particle['life'] <= 0:
+                        particles_to_remove.append(i)
+                
+                for i in reversed(particles_to_remove):
+                    del self.healing_particles[i]
             
-            # Update healing particles
-            particles_to_remove = []
-            for i, particle in enumerate(self.healing_particles):
-                particle['life'] -= 1
-                particle['x'] += particle['dx']
-                particle['y'] += particle['dy']
-                particle['dy'] += 0.1  # Gravity
-                if particle['life'] <= 0:
-                    particles_to_remove.append(i)
-            
-            for i in reversed(particles_to_remove):
-                del self.healing_particles[i]
+            self.draw_everything()
         
-        self.draw_everything()
         self.root.after(16, self.game_loop)
 
 if __name__ == "__main__":
     root = tk.Tk()
-    game = BulletHellGame(root)
+    game = BulletDodgingGame(root)
     root.mainloop()
