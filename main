@@ -378,9 +378,11 @@ class BulletDodgingGame:
                                font=('Arial', 18, 'bold'), tags='settings')
         self.canvas.create_text(300, 150, text="WASD or Arrow Keys - Move", fill='white', 
                                font=('Arial', 14), tags='settings')
-        self.canvas.create_text(300, 175, text="4 - Skip cutscenes", fill='gray', 
+        self.canvas.create_text(300, 175, text="3 - Skip attack", fill='gray', 
                                font=('Arial', 12), tags='settings')
-        self.canvas.create_text(300, 195, text="5 - Skip to Phase 2 (Debug)", fill='gray', 
+        self.canvas.create_text(300, 195, text="4 - Skip cutscenes", fill='gray', 
+                               font=('Arial', 12), tags='settings')
+        self.canvas.create_text(300, 215, text="5 - Skip to Phase 2", fill='gray', 
                                font=('Arial', 12), tags='settings')
         
         self.canvas.create_text(300, 230, text="Gameplay Tips:", fill='yellow', 
@@ -465,7 +467,7 @@ class BulletDodgingGame:
                                font=('Arial', 12), tags='credits')
         self.canvas.create_text(300, 310, text="A Bullet Dodging Adventure", fill='yellow', 
                                font=('Arial', 12), tags='credits')
-        self.canvas.create_text(300, 330, text="Version 1.4", fill='gray', 
+        self.canvas.create_text(300, 330, text="Version 1.41", fill='gray', 
                                font=('Arial', 10), tags='credits')
         
         # Back button
@@ -1314,11 +1316,11 @@ class BulletDodgingGame:
             self.unlock_achievement('flawless_victory')
         
         # Close Call (5 HP or less)
-        if self.hp <= 20:
+        if self.hp <= 5:
             self.unlock_achievement('close_call')
         
         # Lucky Seven (exactly 7 HP)
-        if self.hp == 20:
+        if self.hp == 7:
             self.unlock_achievement('lucky_seven')
         
         # Glass Cannon (took 15+ hits but still won)
