@@ -2,15 +2,16 @@ import tkinter as tk
 import random
 import math
 import time
+import json
+import os
 
 class BulletDodgingGame:
     def __init__(self, root):
         self.root = root
         self.root.title("Overstory - The Final Battle")
         self.root.configure(bg='black')
-        self.paused = False
         
-        # Game constants
+        # ==================== CONSTANTS ====================
         self.GAME_WIDTH = 600
         self.GAME_HEIGHT = 400
         self.BATTLE_BOX_WIDTH = 400
@@ -23,22 +24,53 @@ class BulletDodgingGame:
         self.battle_box_x = (self.GAME_WIDTH - self.BATTLE_BOX_WIDTH) // 2
         self.battle_box_y = (self.GAME_HEIGHT - self.BATTLE_BOX_HEIGHT) // 2
         
-        # Create canvas
-        self.canvas = tk.Canvas(root, width=self.GAME_WIDTH, height=self.GAME_HEIGHT, bg='black')
-        self.canvas.pack()
-        
-        # Game state
+        # ==================== GAME STATE ====================
         self.game_state = 'start_menu'  # 'start_menu', 'playing', 'game_over', 'victory'
         self.game_running = False
-        self.in_cutscene = True
-        self.cutscene_timer = 0
+        self.paused = False
+        
+        # ==================== PLAYER VARIABLES ====================
+        self.player_x = 110
+        self.player_y = 80
+        self.player_speed = 3
+        self.hp = 20
+        self.max_hp = 20
+        self.invulnerable = False
+        self.invuln_timer = 0
+        self.score = 0
+        self.player_disappeared = False
+        
+        # ==================== BOSS/FIGURE VARIABLES ====================
         self.figure_x = self.GAME_WIDTH // 2
         self.figure_y = self.GAME_HEIGHT // 2
-        self.figure_target_y = self.battle_box_y - 40  # Position above battle box
+        self.figure_target_y = self.battle_box_y - 40
         self.figure_speed = 5
-        self.boss_size = 30  # Boss size
-        self.boss_glow = 0  # For glow animation
-        self.boss_anger = 0  # Anger level (increases in phase 2)
+        self.boss_size = 30
+        self.boss_glow = 0
+        self.boss_anger = 0
+        self.boss_hp = 5
+        self.boss_max_hp = 5
+        
+        # ==================== PHASE/PATTERN VARIABLES ====================
+        self.phase = 1
+        self.pattern_timer = 0
+        self.pattern_type = 0
+        self.pattern_sub_timer = 0
+        self.patterns_completed = 0
+        self.phase2_pattern = 0
+        
+        # Pattern-specific variables
+        self.wave_offset = 0
+        self.spiral_angle = 0
+        self.laser_charge_timer = 0
+        
+        # ==================== BULLET VARIABLES ====================
+        self.bullets = []
+        self.targeting_bullets = []
+        
+        # ==================== CUTSCENE/DIALOGUE VARIABLES ====================
+        self.in_cutscene = True
+        self.cutscene_timer = 0
         self.dialogue_index = 0
         self.dialogue_timer = 0
         self.dialogue = [
@@ -47,68 +79,182 @@ class BulletDodgingGame:
             "Prepare yourself... The battle begins!",
         ]
         
-        # Phase 2 variables
-        self.phase = 1
-        self.phase2_pattern = 0
-        self.boss_hp = 5
-        self.boss_max_hp = 5
-        self.star_active = False
-        self.star_x = 0
-        self.star_y = 0
-        self.star_collected = 0
+        # Phase 2 transition
+        self.transitioning_to_phase2 = False
+        self.phase2_transition_timer = 0
+        self.phase2_dialogue_index = 0
         self.phase2_dialogue = [
             "WHAT?! Impossible! You survived Phase 1?!",
             "I'll CRUSH you with my TRUE POWER!",
             "FACE MY WRATH! THIS ENDS NOW!"
         ]
-        self.phase2_dialogue_index = 0
-        self.transitioning_to_phase2 = False
-        self.phase2_transition_timer = 0
+        
+        # Victory
+        self.in_victory = False
+        self.victory_timer = 0
+        self.victory_dialogue_index = 0
         self.victory_dialogue = [
             "NOOO... THIS CANNOT BE...!",
             "How... how could I... be defeated...",
             "You... You... YOU...",
             "I'LL BE BACK! YOU HAVEN'T SEEN THE LAST OF ME!"
         ]
-        self.victory_dialogue_index = 0
-        self.in_victory = False
-        self.victory_timer = 0
-        self.player_disappeared = False
         
-        self.player_x = 110
-        self.player_y = 80
-        self.player_speed = 3
-        self.bullets = []
-        self.score = 0
-        self.hp = 20
-        self.max_hp = 20
-        self.invulnerable = False
-        self.invuln_timer = 0
+        # ==================== STAR/COLLECTIBLE VARIABLES ====================
+        self.star_active = False
+        self.star_x = 0
+        self.star_y = 0
+        self.star_collected = 0
         
-        # Healing effect
-        self.healing_particles = []
-        
-        # Power-up system - collecting stars gives temporary power
+        # ==================== POWER-UP VARIABLES ====================
         self.power_up_active = False
         self.power_up_timer = 0
         self.power_up_type = None  # 'speed', 'shield', 'slowmo'
         
-        # Enhanced enemy patterns
-        self.pattern_timer = 0
-        self.pattern_type = 0
-        self.pattern_sub_timer = 0
-        self.wave_offset = 0
-        self.spiral_angle = 0
-        self.laser_charge_timer = 0
-        self.targeting_bullets = []
-        self.patterns_completed = 0
+        # ==================== PARTICLE EFFECTS ====================
+        self.healing_particles = []
         
-        # Menu background animation
+        # ==================== MENU VARIABLES ====================
         self.menu_bullets = []
         self.menu_animation_timer = 0
         
-        # Bind keys
+        # ==================== ACHIEVEMENTS ====================
+        # Achievement definitions
+        self.achievements = {
+            'first_blood': {
+                'name': 'First Blood',
+                'description': 'Complete Phase 1',
+                'unlocked': False,
+                'icon': '⚔️',
+                'hidden': False,
+                'reward': None
+            },
+            'untouchable': {
+                'name': 'Untouchable',
+                'description': 'Complete Phase 1 without taking damage',
+                'unlocked': False,
+                'icon': '🛡️',
+                'hidden': False,
+                'reward': 'skin_shield'
+            },
+            'star_collector': {
+                'name': 'Star Collector',
+                'description': 'Collect 3 stars in Phase 2',
+                'unlocked': False,
+                'icon': '⭐',
+                'hidden': False,
+                'reward': None
+            },
+            'champion': {
+                'name': 'Champion',
+                'description': 'Defeat the boss',
+                'unlocked': False,
+                'icon': '👑',
+                'hidden': False,
+                'reward': 'skin_gold'
+            },
+            'flawless_victory': {
+                'name': 'Flawless!',
+                'description': 'Defeat the boss without taking damage',
+                'unlocked': False,
+                'icon': '💎',
+                'hidden': False,
+                'reward': 'skin_diamond'
+            },
+            'close_call': {
+                'name': 'Close Call',
+                'description': 'Win with 5 HP or less',
+                'unlocked': False,
+                'icon': '❤️',
+                'hidden': False,
+                'reward': 'skin_fire'
+            },
+            'power_user': {
+                'name': 'Power User',
+                'description': 'Use all 3 power-up types in one game',
+                'unlocked': False,
+                'icon': '⚡',
+                'hidden': False,
+                'reward': 'skin_rainbow'
+            },
+            'speed_demon': {
+                'name': 'Speed Demon',
+                'description': 'Complete the game in under 5 minutes',
+                'unlocked': False,
+                'icon': '⏱️',
+                'hidden': False,
+                'reward': 'skin_lightning'
+            },
+            'secret_konami': {
+                'name': '↑↑↓↓←→←→',
+                'description': 'You found the secret code!',
+                'unlocked': False,
+                'icon': '🎮',
+                'hidden': True,
+                'reward': 'skin_retro'
+            },
+            'persistent': {
+                'name': 'Persistent',
+                'description': 'Die 5 times and keep trying',
+                'unlocked': False,
+                'icon': '💪',
+                'hidden': True,
+                'reward': 'skin_determination'
+            },
+            'the_collector': {
+                'name': 'The Collector',
+                'description': '???',
+                'unlocked': False,
+                'icon': '🏆',
+                'hidden': True,
+                'reward': 'skin_platinum'
+            }
+        }
+        
+        # Skin definitions
+        self.skins = {
+            'default': {'name': 'Default', 'color': 'red', 'outline': 'white'},
+            'skin_gold': {'name': 'Golden Champion', 'color': 'gold', 'outline': 'yellow'},
+            'skin_diamond': {'name': 'Diamond', 'color': 'cyan', 'outline': 'white'},
+            'skin_shield': {'name': 'Shield Bearer', 'color': 'blue', 'outline': 'cyan'},
+            'skin_fire': {'name': 'Phoenix', 'color': 'orange', 'outline': 'red'},
+            'skin_rainbow': {'name': 'Rainbow', 'color': 'magenta', 'outline': 'yellow'},
+            'skin_lightning': {'name': 'Lightning', 'color': 'yellow', 'outline': 'white'},
+            'skin_retro': {'name': 'Retro', 'color': 'lime', 'outline': 'green'},
+            'skin_determination': {'name': 'Determined', 'color': 'purple', 'outline': 'magenta'},
+            'skin_platinum': {'name': 'Platinum Collector', 'color': 'white', 'outline': 'silver'}
+        }
+        
+        # Current selected skin
+        self.current_skin = 'default'
+        
+        # Achievement tracking variables
+        self.newly_unlocked = []  # Achievements unlocked this session
+        self.show_achievement_popup = False
+        self.achievement_popup_timer = 0
+        self.achievement_popup_achievement = None
+        
+        # Session tracking for achievements
+        self.damage_taken_this_game = 0
+        self.power_ups_used_this_game = set()
+        self.game_start_time = 0
+        
+        # Hidden achievement tracking
+        self.konami_sequence = []
+        self.death_count = 0
+        
+        # Load saved achievements and stats
+        self.load_achievements()
+        
+        # ==================== INPUT ====================
         self.keys_pressed = set()
+        
+        # ==================== CANVAS ====================
+        self.canvas = tk.Canvas(root, width=self.GAME_WIDTH, height=self.GAME_HEIGHT, bg='black')
+        self.canvas.pack()
+        
+        # ==================== SETUP ====================
+        # Bind keys
         root.bind('<KeyPress>', self.key_press)
         root.bind('<KeyRelease>', self.key_release)
         root.focus_set()
@@ -154,10 +300,18 @@ class BulletDodgingGame:
         self.canvas.create_text(300, 325, text="CREDITS", fill='white', 
                                font=('Arial', 20, 'bold'), tags='credits_button')
         
+        # Achievements button
+        self.canvas.create_rectangle(200, 360, 400, 395, 
+                                     fill='purple', outline='white', 
+                                     width=3, tags='achievements_button')
+        self.canvas.create_text(300, 377.5, text="ACHIEVEMENTS", fill='white', 
+                               font=('Arial', 16, 'bold'), tags='achievements_button')
+        
         # Bind click events to tags
         self.canvas.tag_bind('play_button', '<Button-1>', lambda e: self.start_game())
         self.canvas.tag_bind('settings_button', '<Button-1>', lambda e: self.show_settings())
         self.canvas.tag_bind('credits_button', '<Button-1>', lambda e: self.show_credits())
+        self.canvas.tag_bind('achievements_button', '<Button-1>', lambda e: self.show_achievements())
     
     def show_settings(self):
         self.canvas.delete('all')
@@ -218,7 +372,7 @@ class BulletDodgingGame:
                                font=('Arial', 12), tags='credits')
         self.canvas.create_text(300, 310, text="A Bullet Dodging Adventure", fill='yellow', 
                                font=('Arial', 12), tags='credits')
-        self.canvas.create_text(300, 330, text="Version 1.2", fill='gray', 
+        self.canvas.create_text(300, 330, text="Version 1.3", fill='gray', 
                                font=('Arial', 10), tags='credits')
         
         # Back button
@@ -230,48 +384,249 @@ class BulletDodgingGame:
         
         self.canvas.tag_bind('back_button', '<Button-1>', lambda e: self.show_start_menu())
     
+    def show_achievements(self):
+        self.canvas.delete('all')
+        
+        self.canvas.create_text(300, 20, text="ACHIEVEMENTS", fill='gold', 
+                               font=('Arial', 24, 'bold'), tags='achievements')
+        
+        # Count unlocked achievements
+        total = len(self.achievements)
+        unlocked_count = sum(1 for ach in self.achievements.values() if ach['unlocked'])
+        
+        self.canvas.create_text(300, 45, text=f"{unlocked_count}/{total} Unlocked", 
+                               fill='cyan', font=('Arial', 12), tags='achievements')
+        
+        # Display achievements in a 4-column grid
+        y_start = 70
+        x_positions = [75, 225, 375, 525]  # 4 columns
+        achievements_per_row = 4
+        box_width = 130  # Width of each achievement box
+        box_height = 60  # Height of each achievement box
+        
+        current_x_idx = 0
+        current_y = y_start
+        
+        for ach_id, ach in self.achievements.items():
+            x = x_positions[current_x_idx]
+            
+            # Skip hidden achievements that aren't unlocked
+            if ach['hidden'] and not ach['unlocked']:
+                # Show placeholder for hidden achievement
+                self.canvas.create_rectangle(x - box_width//2, current_y, 
+                                            x + box_width//2, current_y + box_height,
+                                             fill='black', outline='darkgray', width=1, tags='achievements')
+                self.canvas.create_text(x, current_y + box_height//2, text="??? HIDDEN ???", 
+                                       fill='darkgray', font=('Arial', 8, 'italic'), tags='achievements')
+            else:
+                # Achievement box
+                box_color = 'darkgreen' if ach['unlocked'] else 'darkgray'
+                self.canvas.create_rectangle(x - box_width//2, current_y, 
+                                            x + box_width//2, current_y + box_height,
+                                             fill=box_color, outline='white', width=2, tags='achievements')
+                
+                # Icon
+                icon_text = ach['icon'] if ach['unlocked'] else '🔒'
+                self.canvas.create_text(x - 40, current_y + box_height//2, text=icon_text, 
+                                       font=('Arial', 16), tags='achievements')
+                
+                # Name
+                name_color = 'yellow' if ach['unlocked'] else 'gray'
+                self.canvas.create_text(x + 15, current_y + 20, text=ach['name'], 
+                                       fill=name_color, font=('Arial', 9, 'bold'), 
+                                       tags='achievements', width=80)
+                
+                # Description
+                desc_color = 'white' if ach['unlocked'] else 'darkgray'
+                self.canvas.create_text(x + 15, current_y + 42, text=ach['description'], 
+                                       fill=desc_color, font=('Arial', 7), 
+                                       tags='achievements', width=80)
+                
+                # Show reward icon if unlocked
+                if ach['unlocked'] and ach['reward']:
+                    self.canvas.create_text(x + box_width//2 - 10, current_y + 10, text="🎨", 
+                                           font=('Arial', 12), tags='achievements')
+            
+            # Move to next position
+            current_x_idx += 1
+            if current_x_idx >= achievements_per_row:
+                current_x_idx = 0
+                current_y += box_height + 10  # Add spacing between rows
+        
+        # Skins button
+        self.canvas.create_rectangle(50, 360, 200, 390, 
+                                     fill='purple', outline='white', 
+                                     width=3, tags='skins_button')
+        self.canvas.create_text(125, 375, text="SKINS", fill='white', 
+                               font=('Arial', 16, 'bold'), tags='skins_button')
+        
+        # Back button
+        self.canvas.create_rectangle(400, 360, 550, 390, 
+                                     fill='darkgreen', outline='white', 
+                                     width=3, tags='back_button')
+        self.canvas.create_text(475, 375, text="BACK", fill='white', 
+                               font=('Arial', 20, 'bold'), tags='back_button')
+        
+        self.canvas.tag_bind('skins_button', '<Button-1>', lambda e: self.show_skins())
+        self.canvas.tag_bind('back_button', '<Button-1>', lambda e: self.show_start_menu())
+    
+    def show_skins(self):
+        self.canvas.delete('all')
+        
+        self.canvas.create_text(300, 30, text="PLAYER SKINS", fill='magenta', 
+                               font=('Arial', 28, 'bold'), tags='skins')
+        
+        self.canvas.create_text(300, 60, text="Click a skin to equip it!", 
+                               fill='cyan', font=('Arial', 12), tags='skins')
+        
+        # Display skins in a grid
+        y_start = 100
+        x_positions = [120, 300, 480]
+        current_x_idx = 0
+        current_y = y_start
+        
+        for skin_id, skin_data in self.skins.items():
+            x = x_positions[current_x_idx]
+            
+            # Check if skin is unlocked
+            unlocked = skin_id == 'default'
+            if not unlocked:
+                # Check if achievement for this skin is unlocked
+                for ach in self.achievements.values():
+                    if ach.get('reward') == skin_id and ach['unlocked']:
+                        unlocked = True
+                        break
+            
+            # Skin box
+            if skin_id == self.current_skin:
+                box_color = 'darkblue'
+                border_color = 'cyan'
+                border_width = 4
+            elif unlocked:
+                box_color = 'darkgreen'
+                border_color = 'white'
+                border_width = 2
+            else:
+                box_color = 'darkgray'
+                border_color = 'gray'
+                border_width = 2
+            
+            self.canvas.create_rectangle(x - 70, current_y, x + 70, current_y + 80,
+                                         fill=box_color, outline=border_color, width=border_width, 
+                                         tags=f'skin_{skin_id}')
+            
+            if unlocked:
+                # Draw preview of player with skin colors
+                player_preview_y = current_y + 25
+                self.canvas.create_oval(x - 12, player_preview_y - 12, 
+                                       x + 12, player_preview_y + 12,
+                                       fill=skin_data['color'], outline=skin_data['outline'], 
+                                       width=2, tags=f'skin_{skin_id}')
+                
+                # Skin name
+                self.canvas.create_text(x, current_y + 50, text=skin_data['name'], 
+                                       fill='yellow', font=('Arial', 9, 'bold'), tags=f'skin_{skin_id}')
+                
+                # Show "EQUIPPED" if current
+                if skin_id == self.current_skin:
+                    self.canvas.create_text(x, current_y + 68, text="EQUIPPED", 
+                                           fill='cyan', font=('Arial', 8, 'bold'), tags=f'skin_{skin_id}')
+                
+                # Bind click to equip skin
+                self.canvas.tag_bind(f'skin_{skin_id}', '<Button-1>', 
+                                    lambda e, s=skin_id: self.equip_skin(s))
+            else:
+                # Locked skin
+                self.canvas.create_text(x, current_y + 25, text="🔒", 
+                                       font=('Arial', 24), tags=f'skin_{skin_id}')
+                self.canvas.create_text(x, current_y + 55, text="Locked", 
+                                       fill='gray', font=('Arial', 10), tags=f'skin_{skin_id}')
+            
+            # Move to next position
+            current_x_idx += 1
+            if current_x_idx >= len(x_positions):
+                current_x_idx = 0
+                current_y += 90
+        
+        # Back button
+        self.canvas.create_rectangle(200, 350, 400, 380, 
+                                     fill='darkgreen', outline='white', 
+                                     width=3, tags='back_button')
+        self.canvas.create_text(300, 365, text="BACK", fill='white', 
+                               font=('Arial', 20, 'bold'), tags='back_button')
+        
+        self.canvas.tag_bind('back_button', '<Button-1>', lambda e: self.show_achievements())
+    
+    def equip_skin(self, skin_id):
+        """Equip a skin and save selection"""
+        self.current_skin = skin_id
+        self.save_achievements()  # Save skin selection
+        self.show_skins()  # Refresh display
+    
     def start_game(self):
         # Reset game state
         self.game_state = 'playing'
         self.game_running = False
+        self.paused = False
+        
+        # Reset cutscene
         self.in_cutscene = True
         self.cutscene_timer = 0
+        self.dialogue_index = 0
+        
+        # Reset figure/boss
         self.figure_x = self.GAME_WIDTH // 2
         self.figure_y = self.GAME_HEIGHT // 2
-        self.dialogue_index = 0
+        self.boss_hp = 5
+        
+        # Reset phase
         self.phase = 1
         self.phase2_pattern = 0
-        self.boss_hp = 5
-        self.star_active = False
-        self.star_collected = 0
-        self.phase2_dialogue_index = 0
-        self.transitioning_to_phase2 = False
-        self.phase2_transition_timer = 0
-        self.victory_dialogue_index = 0
-        self.in_victory = False
-        self.victory_timer = 0
-        self.player_disappeared = False
-        
-        # Spawn player in bottom left of battle box
-        self.player_x = self.battle_box_x + 20
-        self.player_y = self.battle_box_y + self.BATTLE_BOX_HEIGHT - 20
-        self.bullets = []
-        self.score = 0
-        self.hp = 20
-        self.invulnerable = False
-        self.invuln_timer = 0
-        
-        self.healing_particles = []
-        self.power_up_active = False
-        self.power_up_timer = 0
-        self.power_up_type = None
-        
+        self.patterns_completed = 0
         self.pattern_timer = 0
         self.pattern_type = 0
         self.pattern_sub_timer = 0
         self.wave_offset = 0
         self.spiral_angle = 0
-        self.patterns_completed = 0
+        
+        # Reset transitions
+        self.transitioning_to_phase2 = False
+        self.phase2_transition_timer = 0
+        self.phase2_dialogue_index = 0
+        
+        # Reset victory
+        self.in_victory = False
+        self.victory_timer = 0
+        self.victory_dialogue_index = 0
+        self.player_disappeared = False
+        
+        # Reset stars
+        self.star_active = False
+        self.star_collected = 0
+        
+        # Reset player
+        self.player_x = self.battle_box_x + 20
+        self.player_y = self.battle_box_y + self.BATTLE_BOX_HEIGHT - 20
+        self.hp = 20
+        self.score = 0
+        self.invulnerable = False
+        self.invuln_timer = 0
+        
+        # Reset bullets
+        self.bullets = []
+        
+        # Reset power-ups
+        self.power_up_active = False
+        self.power_up_timer = 0
+        self.power_up_type = None
+        
+        # Reset particles
+        self.healing_particles = []
+        
+        # Reset achievement tracking
+        self.damage_taken_this_game = 0
+        self.power_ups_used_this_game = set()
+        self.game_start_time = time.time()
         
         # Clear canvas and create UI
         self.canvas.delete('all')
@@ -349,12 +704,26 @@ class BulletDodgingGame:
             
             phase2_names = ["Chaos Storm", "Death Spiral", "Void Prison", "Meteor Rain", "Final Judgement"]
             self.canvas.create_text(525, 30, text=f"Attack: {phase2_names[self.phase2_pattern]}", 
-                                   fill='red', font=('Arial', 10, 'bold'), tags='pattern_text')
+                                   fill='red', font=('Arial', 9, 'bold'), tags='pattern_text')
             self.canvas.create_text(550, 45, text=f"PHASE 2 ({self.star_collected}/5)", 
                                    fill='magenta', font=('Arial', 9, 'bold'), tags='phase_text')
     
     def key_press(self, event):
         self.keys_pressed.add(event.keysym.lower())
+        
+        # Track Konami code sequence (in menu only)
+        if self.game_state == 'start_menu':
+            konami = ['up', 'up', 'down', 'down', 'left', 'right', 'left', 'right']
+            self.konami_sequence.append(event.keysym.lower())
+            
+            # Keep only last 8 keys
+            if len(self.konami_sequence) > 8:
+                self.konami_sequence.pop(0)
+            
+            # Check if sequence matches
+            if self.konami_sequence == konami:
+                self.unlock_achievement('secret_konami')
+                self.konami_sequence = []  # Reset
         
         # Press 3 to skip attack
         if event.keysym == '3':
@@ -564,6 +933,9 @@ class BulletDodgingGame:
         self.game_state = 'victory'
         self.canvas.delete('all')
         
+        # Check victory achievements
+        self.check_victory_achievements()
+        
         self.canvas.create_rectangle(80, 80, 520, 320, fill='black', outline='gold', width=4, tags='victory')
         self.canvas.create_text(300, 120, text="VICTORY!", fill='gold', 
                                font=('Arial', 32, 'bold'), tags='victory')
@@ -575,8 +947,12 @@ class BulletDodgingGame:
                                fill='cyan', font=('Arial', 11), tags='victory')
         self.canvas.create_text(300, 240, text="Phase 2: All 5 ultimate attacks defeated", 
                                fill='magenta', font=('Arial', 11), tags='victory')
-        self.canvas.create_text(300, 265, text="You are the true champion!", 
-                               fill='gold', font=('Arial', 12, 'bold'), tags='victory')
+        
+        # Show newly unlocked achievements
+        if self.newly_unlocked:
+            unlock_count = len(self.newly_unlocked)
+            self.canvas.create_text(300, 265, text=f"🏆 {unlock_count} Achievement{'s' if unlock_count != 1 else ''} Unlocked!", 
+                                   fill='gold', font=('Arial', 12, 'bold'), tags='victory')
         
         # Return to menu button
         self.canvas.create_rectangle(200, 280, 400, 310, 
@@ -697,6 +1073,159 @@ class BulletDodgingGame:
                 elif self.phase2_pattern == 4:
                     self.final_judgement_pattern()
     
+    
+    # ==================== ACHIEVEMENT SYSTEM ====================
+    
+    def save_achievements(self):
+        """Save achievements, death count, and skin selection to file"""
+        save_data = {
+            'achievements': {},
+            'death_count': self.death_count,
+            'current_skin': self.current_skin
+        }
+        
+        # Save only unlocked status for each achievement
+        for ach_id, ach_data in self.achievements.items():
+            save_data['achievements'][ach_id] = ach_data['unlocked']
+        
+        try:
+            # Save to user's home directory or current directory
+            save_path = os.path.expanduser('~/.overstory_save.json')
+            with open(save_path, 'w') as f:
+                json.dump(save_data, f, indent=2)
+        except Exception as e:
+            print(f"Failed to save achievements: {e}")
+            # Try saving to current directory as fallback
+            try:
+                with open('overstory_save.json', 'w') as f:
+                    json.dump(save_data, f, indent=2)
+            except Exception as e2:
+                print(f"Fallback save also failed: {e2}")
+    
+    def load_achievements(self):
+        """Load achievements, death count, and skin selection from file"""
+        save_path = os.path.expanduser('~/.overstory_save.json')
+        
+        # Try home directory first, then current directory
+        if not os.path.exists(save_path):
+            save_path = 'overstory_save.json'
+        
+        if os.path.exists(save_path):
+            try:
+                with open(save_path, 'r') as f:
+                    save_data = json.load(f)
+                
+                # Load achievement unlocked status
+                for ach_id, unlocked in save_data.get('achievements', {}).items():
+                    if ach_id in self.achievements:
+                        self.achievements[ach_id]['unlocked'] = unlocked
+                
+                # Load death count
+                self.death_count = save_data.get('death_count', 0)
+                
+                # Load skin selection
+                self.current_skin = save_data.get('current_skin', 'default')
+                
+                print(f"Loaded achievements: {sum(1 for a in self.achievements.values() if a['unlocked'])}/{len(self.achievements)} unlocked")
+            except Exception as e:
+                print(f"Failed to load achievements: {e}")
+    
+    def unlock_achievement(self, achievement_id):
+        """Unlock an achievement and show popup"""
+        if achievement_id in self.achievements and not self.achievements[achievement_id]['unlocked']:
+            self.achievements[achievement_id]['unlocked'] = True
+            self.newly_unlocked.append(achievement_id)
+            self.show_achievement_popup = True
+            self.achievement_popup_timer = 180  # 3 seconds
+            self.achievement_popup_achievement = achievement_id
+            
+            # Save achievements immediately when unlocked
+            self.save_achievements()
+            
+            # Check if all achievements are unlocked
+            if all(
+                ach['unlocked']
+                for ach_id, ach in self.achievements.items()
+                if ach_id != 'the_collector'
+            ):
+                self.unlock_achievement('the_collector')
+            
+            print(f"Achievement Unlocked: {self.achievements[achievement_id]['name']}")
+            if self.achievements[achievement_id]['reward']:
+                print(f"  Reward: {self.skins[self.achievements[achievement_id]['reward']]['name']} skin unlocked!")
+    
+    
+    def check_achievements(self):
+        """Check and unlock achievements based on game state"""
+        # Untouchable (Phase 1 without damage)
+        if self.patterns_completed >= 10 and self.damage_taken_this_game == 0:
+            self.unlock_achievement('untouchable')
+        
+        # Star Collector
+        if self.star_collected >= 3:
+            self.unlock_achievement('star_collector')
+        
+        # Power User
+        if len(self.power_ups_used_this_game) >= 3:
+            self.unlock_achievement('power_user')
+    
+    def check_victory_achievements(self):
+        """Check achievements when player wins"""
+        # Champion
+        self.unlock_achievement('champion')
+        
+        # Flawless Victory
+        if self.damage_taken_this_game == 0:
+            self.unlock_achievement('flawless_victory')
+        
+        # Close Call (changed to 5 HP)
+        if self.hp <= 5:
+            self.unlock_achievement('close_call')
+        
+        # Speed Demon
+        game_time = time.time() - self.game_start_time
+        if game_time < 300:  # 5 minutes
+            self.unlock_achievement('speed_demon')
+    
+    def draw_achievement_popup(self):
+        """Draw achievement unlock popup in bottom left"""
+        if self.show_achievement_popup and self.achievement_popup_achievement:
+            ach = self.achievements[self.achievement_popup_achievement]
+            
+            # Popup box in bottom left - made smaller
+            popup_x = 10
+            popup_y = self.GAME_HEIGHT - 60  # Moved up slightly
+            popup_width = 220  # Reduced from 280
+            popup_height = 50  # Reduced from 70
+            
+            self.canvas.create_rectangle(popup_x, popup_y, popup_x + popup_width, popup_y + popup_height,
+                                         fill='black', outline='gold', width=2, tags='achievement_popup')
+            
+            # Achievement unlocked text - smaller font
+            self.canvas.create_text(popup_x + popup_width // 2, popup_y + 10, 
+                                   text="ACHIEVEMENT!",
+                                   fill='gold', font=('Arial', 8, 'bold'), tags='achievement_popup')
+            
+            # Icon and name - more compact
+            self.canvas.create_text(popup_x + 20, popup_y + 32, text=ach['icon'],
+                                   font=('Arial', 18), tags='achievement_popup')
+            self.canvas.create_text(popup_x + 110, popup_y + 28, text=ach['name'],
+                                   fill='yellow', font=('Arial', 9, 'bold'), tags='achievement_popup')
+            self.canvas.create_text(popup_x + 110, popup_y + 42, text=ach['description'],
+                                   fill='white', font=('Arial', 7), tags='achievement_popup')
+            
+            # Show skin reward if applicable - smaller
+            if ach['reward']:
+                self.canvas.create_text(popup_x + popup_width - 15, popup_y + 32, text="🎨",
+                                       font=('Arial', 14), tags='achievement_popup')
+            
+            # Update timer
+            self.achievement_popup_timer -= 1
+            if self.achievement_popup_timer <= 0:
+                self.show_achievement_popup = False
+                self.achievement_popup_achievement = None
+                self.canvas.delete('achievement_popup')
+    
     def start_phase2_transition(self):
         self.game_running = False
         self.transitioning_to_phase2 = True
@@ -704,6 +1233,10 @@ class BulletDodgingGame:
         self.phase2_transition_timer = 0
         self.pattern_timer = 0
         self.pattern_sub_timer = 0
+        
+        # Check Phase 1 achievements
+        self.unlock_achievement('first_blood')
+        self.check_achievements()
     
     def spawn_star(self):
         self.star_active = True
@@ -764,12 +1297,19 @@ class BulletDodgingGame:
                 self.power_up_active = True
                 self.power_up_timer = 180  # 3 seconds at 60fps
                 
+                # Track power-up for achievements
+                self.power_ups_used_this_game.add(self.power_up_type)
+                
+                # Check achievements
+                self.check_achievements()
+                
                 # Next attack
                 self.phase2_pattern = (self.phase2_pattern + 1) % 5
                 self.pattern_sub_timer = 0
                 self.pattern_timer = 0
     
-    # Phase 2 Attack Patterns (HARDER)
+    # ==================== PHASE 2 ATTACK PATTERNS ====================
+    
     def chaos_storm_pattern(self):
         # Massive random bullet spam from all directions (NERFED)
         if self.pattern_timer % 4 == 0:
@@ -929,7 +1469,8 @@ class BulletDodgingGame:
                 'color': 'red', 'type': 'homing'
             })
     
-    # Phase 1 patterns (keeping original)
+    # ==================== PHASE 1 ATTACK PATTERNS ====================
+    
     def enhanced_spiral_pattern(self):
         if self.pattern_timer % 12 == 0:
             center_x = self.GAME_WIDTH // 2
@@ -1183,6 +1724,8 @@ class BulletDodgingGame:
                     'color': 'yellow'
                 })
     
+    # ==================== BULLET/COLLISION UPDATES ====================
+    
     def update_bullets(self):
         bullets_to_remove = []
         
@@ -1268,12 +1811,15 @@ class BulletDodgingGame:
                 player_rect[1] < bullet_rect[3] and player_rect[3] > bullet_rect[1]):
                 
                 self.hp -= 1
+                self.damage_taken_this_game += 1  # Track damage for achievements
                 self.invulnerable = True
                 self.invuln_timer = 10
                 
                 if self.hp <= 0:
                     self.game_over()
                 break
+    
+    # ==================== RENDERING ====================
     
     def draw_everything(self):
         self.canvas.delete('game_object')
@@ -1429,12 +1975,13 @@ class BulletDodgingGame:
                             )
                     
                     # Player
+                    skin = self.skins[self.current_skin]
                     self.canvas.create_oval(
                         self.player_x - self.PLAYER_SIZE//2,
                         self.player_y - self.PLAYER_SIZE//2,
                         self.player_x + self.PLAYER_SIZE//2,
                         self.player_y + self.PLAYER_SIZE//2,
-                        fill='red', outline='white', tags='game_object'
+                        fill=skin['color'], outline=skin['outline'], tags='game_object'
                     )
             
             # Draw healing particles
@@ -1483,6 +2030,14 @@ class BulletDodgingGame:
         self.game_state = 'game_over'
         self.canvas.delete('all')
         
+        # Track death for persistent achievement
+        self.death_count += 1
+        self.save_achievements()  # Save death count
+        
+        # Check for persistent achievement
+        if self.death_count >= 5:
+            self.unlock_achievement('persistent')
+        
         self.canvas.create_rectangle(100, 100, 500, 300, fill='black', outline='white', width=3, tags='gameover')
         self.canvas.create_text(300, 140, text="GAME OVER", fill='red', 
                                font=('Arial', 24, 'bold'), tags='gameover')
@@ -1518,6 +2073,8 @@ class BulletDodgingGame:
                             fill='yellow', font=('Arial', 36, 'bold'), tags='pause')
         self.canvas.create_text(300, 250, text="Press ESC or P to resume",
                             fill='white', font=('Arial', 14), tags='pause')
+    
+    # ==================== MAIN GAME LOOP ====================
     
     def game_loop(self):
         if self.game_state == 'start_menu':
@@ -1558,6 +2115,10 @@ class BulletDodgingGame:
                     self.draw_pause_menu()
             
             self.draw_everything()
+        
+        # Draw achievement popup (on top of everything)
+        if self.game_state == 'playing' and self.show_achievement_popup:
+            self.draw_achievement_popup()
         
         self.root.after(16, self.game_loop)
 
