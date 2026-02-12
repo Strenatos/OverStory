@@ -257,9 +257,10 @@ class BulletDodgingGame:
         self.skins = {
             # Always available
             'default': {'name': 'Default', 'color': 'red', 'outline': 'white'},
+            'skin_starter': {'name': 'Starter Pack', 'color': 'pink', 'outline': 'hotpink'},  # Pre-unlocked
             
             # Regular achievement rewards (in order)
-            'skin_victory': {'name': 'The Victor', 'color': 'white', 'outline': 'red'}, # FIrst Blood
+            'skin_victory': {'name': 'The Victor', 'color': 'white', 'outline': 'red'}, # First Blood
             'skin_shield': {'name': 'Shield Bearer', 'color': 'blue', 'outline': 'cyan'},  # Untouchable
             'skin_star': {'name': 'Starstruck', 'color': 'black', 'outline': 'yellow'},  # Star Collector
             'skin_gold': {'name': 'Golden Champion', 'color': 'gold', 'outline': 'yellow'},  # Champion
@@ -276,9 +277,16 @@ class BulletDodgingGame:
             'skin_determination': {'name': 'Determined', 'color': 'purple', 'outline': 'magenta'},  # Persistent
             'skin_turtle': {'name': 'Turtle', 'color': 'green', 'outline': 'darkgreen'},  # Slowpoke
             'skin_minimal': {'name': 'Minimalist', 'color': 'gray', 'outline': 'darkgray'},  # Unprotected
-            'skin_platinum': {'name': 'Platinum Collector', 'color': 'white', 'outline': 'silver'}  # The Collector
+            'skin_platinum': {'name': 'Platinum Collector', 'color': 'white', 'outline': 'silver'},  # The Collector
+
+            # Special unlocks
+            'skin_developer': {'name': 'Developer', 'color': 'brown', 'outline': 'orange'},  # Hidden credits button
+            'skin_master': {'name': 'Master Collector', 'color': 'darkgoldenrod', 'outline': 'gold', 'animated': True}  # All other skins
         }
-        
+
+        # Track special unlocks
+        self.developer_unlocked = False
+
         # Current selected skin
         self.current_skin = 'default'
         
@@ -331,35 +339,35 @@ class BulletDodgingGame:
         # Title
         self.canvas.create_text(300, 80, text="OVERSTORY", fill='gold', 
                                font=('Arial', 36, 'bold'), tags='menu')
-        self.canvas.create_text(300, 120, text="The Final Battle", fill='white', 
+        self.canvas.create_text(300, 115, text="The Final Battle", fill='white', 
                                font=('Arial', 18), tags='menu')
         
         # Play button
-        self.canvas.create_rectangle(200, 160, 400, 210, 
+        self.canvas.create_rectangle(200, 135, 400, 185, 
                                      fill='darkgreen', outline='white', 
                                      width=3, tags='play_button')
-        self.canvas.create_text(300, 185, text="PLAY", fill='white', 
+        self.canvas.create_text(300, 165, text="PLAY", fill='white', 
                                font=('Arial', 20, 'bold'), tags='play_button')
         
         # Settings button
-        self.canvas.create_rectangle(200, 230, 400, 280, 
+        self.canvas.create_rectangle(200, 205, 400, 255, 
                                      fill='darkblue', outline='white', 
                                      width=3, tags='settings_button')
-        self.canvas.create_text(300, 255, text="SETTINGS", fill='white', 
+        self.canvas.create_text(300, 235, text="SETTINGS", fill='white', 
                                font=('Arial', 20, 'bold'), tags='settings_button')
         
         # Credits button
-        self.canvas.create_rectangle(200, 300, 400, 350, 
+        self.canvas.create_rectangle(200, 275, 400, 325, 
                                      fill='darkred', outline='white', 
                                      width=3, tags='credits_button')
-        self.canvas.create_text(300, 325, text="CREDITS", fill='white', 
+        self.canvas.create_text(300, 300, text="CREDITS", fill='white', 
                                font=('Arial', 20, 'bold'), tags='credits_button')
         
         # Achievements button
-        self.canvas.create_rectangle(200, 360, 400, 395, 
+        self.canvas.create_rectangle(200, 345, 400, 395, 
                                      fill='purple', outline='white', 
                                      width=3, tags='achievements_button')
-        self.canvas.create_text(300, 377.5, text="ACHIEVEMENTS", fill='white', 
+        self.canvas.create_text(300, 370, text="ACHIEVEMENTS", fill='white', 
                                font=('Arial', 16, 'bold'), tags='achievements_button')
         
         # Bind click events to tags
@@ -467,8 +475,15 @@ class BulletDodgingGame:
                                font=('Arial', 12), tags='credits')
         self.canvas.create_text(300, 310, text="A Bullet Dodging Adventure", fill='yellow', 
                                font=('Arial', 12), tags='credits')
-        self.canvas.create_text(300, 330, text="Version 1.41", fill='gray', 
+        self.canvas.create_text(300, 330, text="Version 1.5", fill='gray', 
                                font=('Arial', 10), tags='credits')
+        
+        # Hidden developer button (small, bottom left corner)
+        self.canvas.create_rectangle(5, 385, 35, 395, 
+                                     fill='black', outline='brown', 
+                                     width=1, tags='dev_button')
+        self.canvas.create_text(20, 390, text="DEV", fill='brown', 
+                               font=('Arial', 6), tags='dev_button')
         
         # Back button
         self.canvas.create_rectangle(200, 340, 400, 380, 
@@ -477,7 +492,56 @@ class BulletDodgingGame:
         self.canvas.create_text(300, 360, text="BACK", fill='white', 
                                font=('Arial', 20, 'bold'), tags='back_button')
         
+        self.canvas.tag_bind('dev_button', '<Button-1>', lambda e: self.unlock_developer_skin())
         self.canvas.tag_bind('back_button', '<Button-1>', lambda e: self.show_start_menu())
+    
+    def unlock_developer_skin(self):
+        """Unlock the developer skin from hidden credits button"""
+        if not self.developer_unlocked:
+            self.developer_unlocked = True
+            self.save_achievements()
+            # Show notification
+            for dx in (-2,0,2):
+                for dy in (-2,0,2):
+                    if dx or dy:
+                        self.canvas.create_text(300+dx,150+dy,text="🎨 Developer Skin Unlocked!",
+                                                fill='white',font=('Arial',20,'bold'),tags='credits')
+
+            self.canvas.create_text(300,150,text="🎨 Developer Skin Unlocked!",
+                                    fill='orange',font=('Arial',20,'bold'),tags='credits')
+
+    
+    def check_master_skin(self):
+        """Check if user has unlocked all other skins to unlock Master Collector"""
+        # Get all skins except default and skin_master itself
+        skins_to_check = [skin_id for skin_id in self.skins.keys() 
+                         if skin_id not in ['default', 'skin_master']]
+        
+        all_unlocked = True
+        for skin_id in skins_to_check:
+            if not self.is_skin_unlocked(skin_id):
+                all_unlocked = False
+                break
+        
+        return all_unlocked
+    
+    def is_skin_unlocked(self, skin_id):
+        """Check if a skin is unlocked"""
+        if skin_id in ['default', 'skin_starter']:
+            return True
+        
+        if skin_id == 'skin_developer':
+            return self.developer_unlocked
+        
+        if skin_id == 'skin_master':
+            return self.check_master_skin()
+        
+        # Check if achievement for this skin is unlocked
+        for ach in self.achievements.values():
+            if ach.get('reward') == skin_id and ach['unlocked']:
+                return True
+        
+        return False
     
     def show_achievements(self):
         self.canvas.delete('all')
@@ -596,7 +660,9 @@ class BulletDodgingGame:
             x = x_positions[current_x_idx]
             
             # Check if skin is unlocked
-            unlocked = skin_id == 'default'
+            unlocked = skin_id == 'default' or skin_id == 'skin_starter'
+            unlocked = self.is_skin_unlocked(skin_id)
+            
             if not unlocked:
                 # Check if achievement for this skin is unlocked
                 for ach in self.achievements.values():
@@ -658,11 +724,11 @@ class BulletDodgingGame:
                 current_y += box_height + 8  # Reduced spacing
         
         # Back button
-        self.canvas.create_rectangle(200, 360, 400, 390, 
+        self.canvas.create_rectangle(200, 378, 400, 400, 
                                      fill='darkgreen', outline='white', 
                                      width=3, tags='back_button')
-        self.canvas.create_text(300, 375, text="BACK", fill='white', 
-                               font=('Arial', 20, 'bold'), tags='back_button')
+        self.canvas.create_text(300, 390, text="BACK", fill='white', 
+                               font=('Arial', 10, 'bold'), tags='back_button')
         
         self.canvas.tag_bind('back_button', '<Button-1>', lambda e: self.show_achievements())
     
@@ -1191,7 +1257,8 @@ class BulletDodgingGame:
         save_data = {
             'achievements': {},
             'death_count': self.death_count,
-            'current_skin': self.current_skin
+            'current_skin': self.current_skin,
+            'developer_unlocked': self.developer_unlocked
         }
         
         # Save only unlocked status for each achievement
@@ -1222,6 +1289,7 @@ class BulletDodgingGame:
         self.death_count = 0
         self.current_skin = 'default'
         self.newly_unlocked = []
+        self.developer_unlocked = False
         
         # Save the reset state
         self.save_achievements()
@@ -1251,6 +1319,9 @@ class BulletDodgingGame:
                 
                 # Load death count
                 self.death_count = save_data.get('death_count', 0)
+
+                # Load developer unlock
+                self.developer_unlocked = save_data.get('developer_unlocked', False)
                 
                 # Load skin selection
                 self.current_skin = save_data.get('current_skin', 'default')
