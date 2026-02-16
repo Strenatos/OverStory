@@ -10,7 +10,7 @@ class BulletDodgingGame:
         self.root = root
         self.root.title("Overstory - The Final Battle")
         self.root.configure(bg='black')
-        
+
         # ==================== CONSTANTS ====================
         self.GAME_WIDTH = 600
         self.GAME_HEIGHT = 400
@@ -19,16 +19,16 @@ class BulletDodgingGame:
         self.PLAYER_SIZE = 8
         self.BULLET_SIZE = 4
         self.STAR_SIZE = 12
-        
+
         # Calculate battle box position (centered)
         self.battle_box_x = (self.GAME_WIDTH - self.BATTLE_BOX_WIDTH) // 2
         self.battle_box_y = (self.GAME_HEIGHT - self.BATTLE_BOX_HEIGHT) // 2
-        
+
         # ==================== GAME STATE ====================
         self.game_state = 'start_menu'  # 'start_menu', 'playing', 'game_over', 'victory'
         self.game_running = False
         self.paused = False
-        
+
         # ==================== PLAYER VARIABLES ====================
         self.player_x = 110
         self.player_y = 80
@@ -39,7 +39,7 @@ class BulletDodgingGame:
         self.invuln_timer = 0
         self.score = 0
         self.player_disappeared = False
-        
+
         # ==================== BOSS/FIGURE VARIABLES ====================
         self.figure_x = self.GAME_WIDTH // 2
         self.figure_y = self.GAME_HEIGHT // 2
@@ -50,7 +50,7 @@ class BulletDodgingGame:
         self.boss_anger = 0
         self.boss_hp = 5
         self.boss_max_hp = 5
-        
+
         # ==================== PHASE/PATTERN VARIABLES ====================
         self.phase = 1
         self.pattern_timer = 0
@@ -58,16 +58,16 @@ class BulletDodgingGame:
         self.pattern_sub_timer = 0
         self.patterns_completed = 0
         self.phase2_pattern = 0
-        
+
         # Pattern-specific variables
         self.wave_offset = 0
         self.spiral_angle = 0
         self.laser_charge_timer = 0
-        
+
         # ==================== BULLET VARIABLES ====================
         self.bullets = []
         self.targeting_bullets = []
-        
+
         # ==================== CUTSCENE/DIALOGUE VARIABLES ====================
         self.in_cutscene = True
         self.cutscene_timer = 0
@@ -78,7 +78,7 @@ class BulletDodgingGame:
             "You think you can survive my attacks?",
             "Prepare yourself... The battle begins!",
         ]
-        
+
         # Phase 2 transition
         self.transitioning_to_phase2 = False
         self.phase2_transition_timer = 0
@@ -88,7 +88,7 @@ class BulletDodgingGame:
             "I'll CRUSH you with my TRUE POWER!",
             "FACE MY WRATH! THIS ENDS NOW!"
         ]
-        
+
         # Victory
         self.in_victory = False
         self.victory_timer = 0
@@ -99,25 +99,25 @@ class BulletDodgingGame:
             "You... You... YOU...",
             "I'LL BE BACK! YOU HAVEN'T SEEN THE LAST OF ME!"
         ]
-        
+
         # ==================== STAR/COLLECTIBLE VARIABLES ====================
         self.star_active = False
         self.star_x = 0
         self.star_y = 0
         self.star_collected = 0
-        
+
         # ==================== POWER-UP VARIABLES ====================
         self.power_up_active = False
-        self.power_up_timer = 0
-        self.power_up_type = None  # 'speed', 'shield', 'slowmo'
-        
+        self.power_up_type = None  # 'speed', 'shield', 'slowmo', 'clear'
+        self.power_up_timer = 0 # Used for both duration and delay
+
         # ==================== PARTICLE EFFECTS ====================
         self.healing_particles = []
-        
+
         # ==================== MENU VARIABLES ====================
         self.menu_bullets = []
         self.menu_animation_timer = 0
-        
+
         # ==================== ACHIEVEMENTS ====================
         # Achievement definitions
         self.achievements = {
@@ -172,7 +172,7 @@ class BulletDodgingGame:
             },
             'power_user': {
                 'name': 'Power User',
-                'description': 'Use all 3 power-up types in one game',
+                'description': 'Use all 4 power-up types in one game',
                 'unlocked': False,
                 'icon': '⚡',
                 'hidden': False,
@@ -252,13 +252,13 @@ class BulletDodgingGame:
                 'font_size': 7
             }
         }
-        
+
         # Skin definitions (sorted by achievement order)
         self.skins = {
             # Always available
             'default': {'name': 'Default', 'color': 'red', 'outline': 'white'},
             'skin_starter': {'name': 'Starter Pack', 'color': 'pink', 'outline': 'hotpink'},  # Pre-unlocked
-            
+
             # Regular achievement rewards (in order)
             'skin_victory': {'name': 'The Victor', 'color': 'white', 'outline': 'red'}, # First Blood
             'skin_shield': {'name': 'Shield Bearer', 'color': 'blue', 'outline': 'cyan'},  # Untouchable
@@ -271,7 +271,7 @@ class BulletDodgingGame:
             'skin_cosmic': {'name': 'Cosmic', 'color': 'darkviolet', 'outline': 'violet'},  # Star Master
             'skin_warrior': {'name': 'Battle Scarred', 'color': 'darkred', 'outline': 'red'},  # Glass Cannon
             'skin_lucky': {'name': 'Lucky', 'color': 'lightgreen', 'outline': 'green'},  # Lucky Seven
-            
+
             # Hidden achievement rewards (in order)
             'skin_retro': {'name': 'Retro', 'color': 'lime', 'outline': 'green'},  # Konami Code
             'skin_determination': {'name': 'Determined', 'color': 'purple', 'outline': 'magenta'},  # Persistent
@@ -289,212 +289,212 @@ class BulletDodgingGame:
 
         # Current selected skin
         self.current_skin = 'default'
-        
+
         # Achievement tracking variables
         self.newly_unlocked = []  # Achievements unlocked this session
         self.show_achievement_popup = False
         self.achievement_popup_timer = 0
         self.achievement_popup_achievement = None
-        
+
         # Session tracking for achievements
         self.damage_taken_this_game = 0
         self.power_ups_used_this_game = set()
         self.game_start_time = 0
         self.power_ups_collected_this_game = 0  # Track if any power-ups collected
-        
+
         # Hidden achievement tracking
         self.konami_sequence = []
         self.death_count = 0
-        
+
         # Load saved achievements and stats
         self.load_achievements()
-        
+
         # ==================== INPUT ====================
         self.keys_pressed = set()
-        
+
         # ==================== CANVAS ====================
         self.canvas = tk.Canvas(root, width=self.GAME_WIDTH, height=self.GAME_HEIGHT, bg='black')
         self.canvas.pack()
-        
+
         # ==================== SETUP ====================
         # Bind keys
         root.bind('<KeyPress>', self.key_press)
         root.bind('<KeyRelease>', self.key_release)
         root.focus_set()
-        
+
         # Show start menu
         self.show_start_menu()
-        
+
         # Start game loop
         self.game_loop()
-    
+
     def show_start_menu(self):
         self.game_state = 'start_menu'
         self.canvas.delete('all')
-        
+
         # Initialize menu background bullets
         self.menu_bullets = []
         self.menu_animation_timer = 0
-        
+
         # Title
-        self.canvas.create_text(300, 80, text="OVERSTORY", fill='gold', 
+        self.canvas.create_text(300, 80, text="OVERSTORY", fill='gold',
                                font=('Arial', 36, 'bold'), tags='menu')
-        self.canvas.create_text(300, 115, text="The Final Battle", fill='white', 
+        self.canvas.create_text(300, 115, text="The Final Battle", fill='white',
                                font=('Arial', 18), tags='menu')
-        
+
         # Play button
-        self.canvas.create_rectangle(200, 135, 400, 185, 
-                                     fill='darkgreen', outline='white', 
+        self.canvas.create_rectangle(200, 135, 400, 185,
+                                     fill='darkgreen', outline='white',
                                      width=3, tags='play_button')
-        self.canvas.create_text(300, 165, text="PLAY", fill='white', 
+        self.canvas.create_text(300, 165, text="PLAY", fill='white',
                                font=('Arial', 20, 'bold'), tags='play_button')
-        
+
         # Settings button
-        self.canvas.create_rectangle(200, 205, 400, 255, 
-                                     fill='darkblue', outline='white', 
+        self.canvas.create_rectangle(200, 205, 400, 255,
+                                     fill='darkblue', outline='white',
                                      width=3, tags='settings_button')
-        self.canvas.create_text(300, 235, text="SETTINGS", fill='white', 
+        self.canvas.create_text(300, 235, text="SETTINGS", fill='white',
                                font=('Arial', 20, 'bold'), tags='settings_button')
-        
+
         # Credits button
-        self.canvas.create_rectangle(200, 275, 400, 325, 
-                                     fill='darkred', outline='white', 
+        self.canvas.create_rectangle(200, 275, 400, 325,
+                                     fill='darkred', outline='white',
                                      width=3, tags='credits_button')
-        self.canvas.create_text(300, 300, text="CREDITS", fill='white', 
+        self.canvas.create_text(300, 300, text="CREDITS", fill='white',
                                font=('Arial', 20, 'bold'), tags='credits_button')
-        
+
         # Achievements button
-        self.canvas.create_rectangle(200, 345, 400, 395, 
-                                     fill='purple', outline='white', 
+        self.canvas.create_rectangle(200, 345, 400, 395,
+                                     fill='purple', outline='white',
                                      width=3, tags='achievements_button')
-        self.canvas.create_text(300, 370, text="ACHIEVEMENTS", fill='white', 
+        self.canvas.create_text(300, 370, text="ACHIEVEMENTS", fill='white',
                                font=('Arial', 16, 'bold'), tags='achievements_button')
-        
+
         # Bind click events to tags
         self.canvas.tag_bind('play_button', '<Button-1>', lambda e: self.start_game())
         self.canvas.tag_bind('settings_button', '<Button-1>', lambda e: self.show_settings())
         self.canvas.tag_bind('credits_button', '<Button-1>', lambda e: self.show_credits())
         self.canvas.tag_bind('achievements_button', '<Button-1>', lambda e: self.show_achievements())
-    
+
     def show_settings(self):
         self.canvas.delete('all')
-        
-        self.canvas.create_text(300, 60, text="SETTINGS", fill='cyan', 
+
+        self.canvas.create_text(300, 60, text="SETTINGS", fill='cyan',
                                font=('Arial', 28, 'bold'), tags='settings')
-        
-        self.canvas.create_text(300, 120, text="Controls:", fill='white', 
+
+        self.canvas.create_text(300, 120, text="Controls:", fill='white',
                                font=('Arial', 18, 'bold'), tags='settings')
-        self.canvas.create_text(300, 150, text="WASD or Arrow Keys - Move", fill='white', 
+        self.canvas.create_text(300, 150, text="WASD or Arrow Keys - Move", fill='white',
                                font=('Arial', 14), tags='settings')
-        self.canvas.create_text(300, 175, text="3 - Skip attack", fill='gray', 
+        self.canvas.create_text(300, 175, text="3 - Skip attack", fill='gray',
                                font=('Arial', 12), tags='settings')
-        self.canvas.create_text(300, 195, text="4 - Skip cutscenes", fill='gray', 
+        self.canvas.create_text(300, 195, text="4 - Skip cutscenes", fill='gray',
                                font=('Arial', 12), tags='settings')
-        self.canvas.create_text(300, 215, text="5 - Skip to Phase 2", fill='gray', 
+        self.canvas.create_text(300, 215, text="5 - Skip to Phase 2", fill='gray',
                                font=('Arial', 12), tags='settings')
-        
-        self.canvas.create_text(300, 230, text="Gameplay Tips:", fill='yellow', 
+
+        self.canvas.create_text(300, 230, text="Gameplay Tips:", fill='yellow',
                                font=('Arial', 16, 'bold'), tags='settings')
-        self.canvas.create_text(300, 255, text="• Collect golden stars to damage the boss", fill='white', 
+        self.canvas.create_text(300, 255, text="• Collect golden stars to damage the boss", fill='white',
                                font=('Arial', 12), tags='settings')
-        self.canvas.create_text(300, 275, text="• Stars heal you and grant random power-ups", fill='white', 
+        self.canvas.create_text(300, 275, text="• Stars heal you and grant random power-ups", fill='white',
                                font=('Arial', 12), tags='settings')
-        self.canvas.create_text(300, 295, text="• Survive 10 patterns in Phase 1", fill='cyan', 
+        self.canvas.create_text(300, 295, text="• Survive 10 patterns in Phase 1", fill='cyan',
                                font=('Arial', 12), tags='settings')
-        self.canvas.create_text(300, 315, text="• Defeat the boss in Phase 2 by collecting 5 stars", fill='magenta', 
+        self.canvas.create_text(300, 315, text="• Defeat the boss in Phase 2 by collecting 5 stars", fill='magenta',
                                font=('Arial', 12), tags='settings')
-        
+
         # Reset button (red/warning)
-        self.canvas.create_rectangle(175, 340, 425, 370, 
-                                     fill='darkred', outline='red', 
+        self.canvas.create_rectangle(175, 340, 425, 370,
+                                     fill='darkred', outline='red',
                                      width=3, tags='reset_button')
-        self.canvas.create_text(300, 355, text="⚠️ RESET ALL DATA ⚠️", fill='white', 
+        self.canvas.create_text(300, 355, text="⚠️ RESET ALL DATA ⚠️", fill='white',
                                font=('Arial', 14, 'bold'), tags='reset_button')
-        
+
         # Back button
-        self.canvas.create_rectangle(200, 375, 400, 395, 
-                                     fill='darkgreen', outline='white', 
+        self.canvas.create_rectangle(200, 375, 400, 395,
+                                     fill='darkgreen', outline='white',
                                      width=3, tags='back_button')
-        self.canvas.create_text(300, 385, text="BACK", fill='white', 
+        self.canvas.create_text(300, 385, text="BACK", fill='white',
                                font=('Arial', 14, 'bold'), tags='back_button')
-        
+
         self.canvas.tag_bind('reset_button', '<Button-1>', lambda e: self.confirm_reset())
         self.canvas.tag_bind('back_button', '<Button-1>', lambda e: self.show_start_menu())
-    
+
     def confirm_reset(self):
         """Show confirmation dialog for reset"""
         self.canvas.delete('all')
-        
-        self.canvas.create_text(300, 120, text="ARE YOU SURE?", fill='red', 
+
+        self.canvas.create_text(300, 120, text="ARE YOU SURE?", fill='red',
                                font=('Arial', 32, 'bold'), tags='confirm')
-        self.canvas.create_text(300, 170, text="This will delete ALL achievements,", fill='white', 
+        self.canvas.create_text(300, 170, text="This will delete ALL achievements,", fill='white',
                                font=('Arial', 14), tags='confirm')
-        self.canvas.create_text(300, 190, text="skins, and progress!", fill='white', 
+        self.canvas.create_text(300, 190, text="skins, and progress!", fill='white',
                                font=('Arial', 14), tags='confirm')
-        self.canvas.create_text(300, 220, text="This action CANNOT be undone!", fill='yellow', 
+        self.canvas.create_text(300, 220, text="This action CANNOT be undone!", fill='yellow',
                                font=('Arial', 12, 'bold'), tags='confirm')
-        
+
         # Yes button (red)
-        self.canvas.create_rectangle(150, 260, 280, 300, 
-                                     fill='darkred', outline='red', 
+        self.canvas.create_rectangle(150, 260, 280, 300,
+                                     fill='darkred', outline='red',
                                      width=3, tags='yes_button')
-        self.canvas.create_text(215, 280, text="YES, RESET", fill='white', 
+        self.canvas.create_text(215, 280, text="YES, RESET", fill='white',
                                font=('Arial', 14, 'bold'), tags='yes_button')
-        
+
         # No button (green)
-        self.canvas.create_rectangle(320, 260, 450, 300, 
-                                     fill='darkgreen', outline='green', 
+        self.canvas.create_rectangle(320, 260, 450, 300,
+                                     fill='darkgreen', outline='green',
                                      width=3, tags='no_button')
-        self.canvas.create_text(385, 280, text="NO, GO BACK", fill='white', 
+        self.canvas.create_text(385, 280, text="NO, GO BACK", fill='white',
                                font=('Arial', 14, 'bold'), tags='no_button')
-        
+
         self.canvas.tag_bind('yes_button', '<Button-1>', lambda e: self.reset_all_data())
         self.canvas.tag_bind('no_button', '<Button-1>', lambda e: self.show_settings())
-    
+
     def show_credits(self):
         self.canvas.delete('all')
-        
-        self.canvas.create_text(300, 60, text="CREDITS", fill='gold', 
+
+        self.canvas.create_text(300, 60, text="CREDITS", fill='gold',
                                font=('Arial', 28, 'bold'), tags='credits')
-        
-        self.canvas.create_text(300, 120, text="Game Design & Programming", fill='white', 
+
+        self.canvas.create_text(300, 120, text="Game Design & Programming", fill='white',
                                font=('Arial', 16, 'bold'), tags='credits')
-        self.canvas.create_text(300, 145, text="Strenatos :3", fill='cyan', 
+        self.canvas.create_text(300, 145, text="Strenatos :3", fill='cyan',
                                font=('Arial', 14), tags='credits')
-        
-        self.canvas.create_text(300, 185, text="Special Thanks To:", fill='yellow', 
+
+        self.canvas.create_text(300, 185, text="Special Thanks To:", fill='yellow',
                                font=('Arial', 14, 'bold'), tags='credits')
-        self.canvas.create_text(300, 210, text="sans", fill='white', 
+        self.canvas.create_text(300, 210, text="sans", fill='white',
                                font=('Arial', 12), tags='credits')
-        self.canvas.create_text(300, 230, text="John.", fill='white', 
+        self.canvas.create_text(300, 230, text="John.", fill='white',
                                font=('Arial', 12), tags='credits')
-        self.canvas.create_text(300, 250, text="The gang", fill='white', 
+        self.canvas.create_text(300, 250, text="The gang", fill='white',
                                font=('Arial', 12), tags='credits')
-        
-        self.canvas.create_text(300, 290, text="Created with Python & Tkinter", fill='white', 
+
+        self.canvas.create_text(300, 290, text="Created with Python & Tkinter", fill='white',
                                font=('Arial', 12), tags='credits')
-        self.canvas.create_text(300, 310, text="A Bullet Dodging Adventure", fill='yellow', 
+        self.canvas.create_text(300, 310, text="A Bullet Dodging Adventure", fill='yellow',
                                font=('Arial', 12), tags='credits')
-        self.canvas.create_text(300, 330, text="Version 1.5", fill='gray', 
+        self.canvas.create_text(300, 330, text="Version 1.5", fill='gray',
                                font=('Arial', 10), tags='credits')
-        
+
         # Hidden developer button (small, bottom left corner)
-        self.canvas.create_rectangle(5, 385, 35, 395, 
-                                     fill='black', outline='brown', 
+        self.canvas.create_rectangle(5, 385, 35, 395,
+                                     fill='black', outline='brown',
                                      width=1, tags='dev_button')
-        self.canvas.create_text(20, 390, text="DEV", fill='brown', 
+        self.canvas.create_text(20, 390, text="DEV", fill='brown',
                                font=('Arial', 6), tags='dev_button')
-        
+
         # Back button
-        self.canvas.create_rectangle(200, 340, 400, 380, 
-                                     fill='darkgreen', outline='white', 
+        self.canvas.create_rectangle(200, 340, 400, 380,
+                                     fill='darkgreen', outline='white',
                                      width=3, tags='back_button')
-        self.canvas.create_text(300, 360, text="BACK", fill='white', 
+        self.canvas.create_text(300, 360, text="BACK", fill='white',
                                font=('Arial', 20, 'bold'), tags='back_button')
-        
+
         self.canvas.tag_bind('dev_button', '<Button-1>', lambda e: self.unlock_developer_skin())
         self.canvas.tag_bind('back_button', '<Button-1>', lambda e: self.show_start_menu())
-    
+
     def unlock_developer_skin(self):
         """Unlock the developer skin from hidden credits button"""
         if not self.developer_unlocked:
@@ -510,94 +510,94 @@ class BulletDodgingGame:
             self.canvas.create_text(300,150,text="🎨 Developer Skin Unlocked!",
                                     fill='orange',font=('Arial',20,'bold'),tags='credits')
 
-    
+
     def check_master_skin(self):
         """Check if user has unlocked all other skins to unlock Master Collector"""
         # Get all skins except default and skin_master itself
-        skins_to_check = [skin_id for skin_id in self.skins.keys() 
+        skins_to_check = [skin_id for skin_id in self.skins.keys()
                          if skin_id not in ['default', 'skin_master']]
-        
+
         all_unlocked = True
         for skin_id in skins_to_check:
             if not self.is_skin_unlocked(skin_id):
                 all_unlocked = False
                 break
-        
+
         return all_unlocked
-    
+
     def is_skin_unlocked(self, skin_id):
         """Check if a skin is unlocked"""
         if skin_id in ['default', 'skin_starter']:
             return True
-        
+
         if skin_id == 'skin_developer':
             return self.developer_unlocked
-        
+
         if skin_id == 'skin_master':
             return self.check_master_skin()
-        
+
         # Check if achievement for this skin is unlocked
         for ach in self.achievements.values():
             if ach.get('reward') == skin_id and ach['unlocked']:
                 return True
-        
+
         return False
-    
+
     def show_achievements(self):
         self.canvas.delete('all')
-        
-        self.canvas.create_text(300, 20, text="ACHIEVEMENTS", fill='gold', 
+
+        self.canvas.create_text(300, 20, text="ACHIEVEMENTS", fill='gold',
                                font=('Arial', 24, 'bold'), tags='achievements')
-        
+
         # Count unlocked achievements
         total = len(self.achievements)
         unlocked_count = sum(1 for ach in self.achievements.values() if ach['unlocked'])
-        
-        self.canvas.create_text(300, 45, text=f"{unlocked_count}/{total} Unlocked", 
+
+        self.canvas.create_text(300, 45, text=f"{unlocked_count}/{total} Unlocked",
                                fill='cyan', font=('Arial', 12), tags='achievements')
-        
+
         # Display achievements in a 4-column grid
         y_start = 70
         x_positions = [75, 225, 375, 525]  # 4 columns
         achievements_per_row = 4
         box_width = 130  # Width of each achievement box
         box_height = 60  # Height of each achievement box
-        
+
         current_x_idx = 0
         current_y = y_start
-        
+
         for ach_id, ach in self.achievements.items():
             x = x_positions[current_x_idx]
-            
+
             # Skip hidden achievements that aren't unlocked
             if ach['hidden'] and not ach['unlocked']:
                 # Show placeholder for hidden achievement
-                self.canvas.create_rectangle(x - box_width//2, current_y, 
+                self.canvas.create_rectangle(x - box_width//2, current_y,
                                             x + box_width//2, current_y + box_height,
                                              fill='black', outline='darkgray', width=1, tags='achievements')
-                self.canvas.create_text(x, current_y + box_height//2, text="??? HIDDEN ???", 
+                self.canvas.create_text(x, current_y + box_height//2, text="??? HIDDEN ???",
                                        fill='darkgray', font=('Arial', 8, 'italic'), tags='achievements')
             else:
                 # Achievement box
                 box_color = 'darkgreen' if ach['unlocked'] else 'darkgray'
-                self.canvas.create_rectangle(x - box_width//2, current_y, 
+                self.canvas.create_rectangle(x - box_width//2, current_y,
                                             x + box_width//2, current_y + box_height,
                                              fill=box_color, outline='white', width=2, tags='achievements')
-                
+
                 # Icon
                 icon_text = ach['icon'] if ach['unlocked'] else '🔒'
-                self.canvas.create_text(x - 40, current_y + box_height//2, text=icon_text, 
+                self.canvas.create_text(x - 40, current_y + box_height//2, text=icon_text,
                                        font=('Arial', 16), tags='achievements')
-                
+
                 # Name
                 name_color = 'yellow' if ach['unlocked'] else 'gray'
-                self.canvas.create_text(x + 15, current_y + 20, text=ach['name'], 
-                                       fill=name_color, font=('Arial', 9, 'bold'), 
+                self.canvas.create_text(x + 15, current_y + 20, text=ach['name'],
+                                       fill=name_color, font=('Arial', 9, 'bold'),
                                        tags='achievements', width=80)
-                
+
                 # Description
                 desc_color = 'white' if ach['unlocked'] else 'darkgray'
-                font_size = ach.get('font_size', 7)  # default is 7
+                font_size = ach.get('font_size', 7)
 
                 self.canvas.create_text(
                     x + 15,
@@ -611,65 +611,65 @@ class BulletDodgingGame:
 
                 # Show reward icon if unlocked
                 if ach['unlocked'] and ach['reward']:
-                    self.canvas.create_text(x + box_width//2 - 10, current_y + 10, text="🎨", 
+                    self.canvas.create_text(x + box_width//2 - 10, current_y + 10, text="🎨",
                                            font=('Arial', 12), tags='achievements')
-            
+
             # Move to next position
             current_x_idx += 1
             if current_x_idx >= achievements_per_row:
                 current_x_idx = 0
                 current_y += box_height + 10  # Add spacing between rows
-        
+
         # Skins button
-        self.canvas.create_rectangle(50, 360, 200, 390, 
-                                     fill='purple', outline='white', 
+        self.canvas.create_rectangle(50, 360, 200, 390,
+                                     fill='purple', outline='white',
                                      width=3, tags='skins_button')
-        self.canvas.create_text(125, 375, text="SKINS", fill='white', 
+        self.canvas.create_text(125, 375, text="SKINS", fill='white',
                                font=('Arial', 16, 'bold'), tags='skins_button')
-        
+
         # Back button
-        self.canvas.create_rectangle(400, 360, 550, 390, 
-                                     fill='darkgreen', outline='white', 
+        self.canvas.create_rectangle(400, 360, 550, 390,
+                                     fill='darkgreen', outline='white',
                                      width=3, tags='back_button')
-        self.canvas.create_text(475, 375, text="BACK", fill='white', 
+        self.canvas.create_text(475, 375, text="BACK", fill='white',
                                font=('Arial', 20, 'bold'), tags='back_button')
-        
+
         self.canvas.tag_bind('skins_button', '<Button-1>', lambda e: self.show_skins())
         self.canvas.tag_bind('back_button', '<Button-1>', lambda e: self.show_start_menu())
-    
+
     def show_skins(self):
         self.canvas.delete('all')
-        
-        self.canvas.create_text(300, 20, text="PLAYER SKINS", fill='magenta', 
+
+        self.canvas.create_text(300, 20, text="PLAYER SKINS", fill='magenta',
                                font=('Arial', 24, 'bold'), tags='skins')
-        
-        self.canvas.create_text(300, 45, text="Click a skin to equip it!", 
+
+        self.canvas.create_text(300, 45, text="Click a skin to equip it!",
                                fill='cyan', font=('Arial', 10), tags='skins')
-        
+
         # Display skins in a 5-column grid with smaller boxes
         y_start = 70
         x_positions = [60, 180, 300, 420, 540]  # 5 columns
         skins_per_row = 5
         box_width = 100  # Reduced from 140
         box_height = 70  # Reduced from 80
-        
+
         current_x_idx = 0
         current_y = y_start
-        
+
         for skin_id, skin_data in self.skins.items():
             x = x_positions[current_x_idx]
-            
+
             # Check if skin is unlocked
             unlocked = skin_id == 'default' or skin_id == 'skin_starter'
             unlocked = self.is_skin_unlocked(skin_id)
-            
+
             if not unlocked:
                 # Check if achievement for this skin is unlocked
                 for ach in self.achievements.values():
                     if ach.get('reward') == skin_id and ach['unlocked']:
                         unlocked = True
                         break
-            
+
             # Skin box
             if skin_id == self.current_skin:
                 box_color = 'darkblue'
@@ -683,77 +683,77 @@ class BulletDodgingGame:
                 box_color = 'darkgray'
                 border_color = 'gray'
                 border_width = 2
-            
-            self.canvas.create_rectangle(x - box_width//2, current_y, 
+
+            self.canvas.create_rectangle(x - box_width//2, current_y,
                                          x + box_width//2, current_y + box_height,
-                                         fill=box_color, outline=border_color, width=border_width, 
+                                         fill=box_color, outline=border_color, width=border_width,
                                          tags=f'skin_{skin_id}')
-            
+
             if unlocked:
                 # Draw preview of player with skin colors
                 player_preview_y = current_y + 20
-                self.canvas.create_oval(x - 10, player_preview_y - 10, 
+                self.canvas.create_oval(x - 10, player_preview_y - 10,
                                        x + 10, player_preview_y + 10,
-                                       fill=skin_data['color'], outline=skin_data['outline'], 
+                                       fill=skin_data['color'], outline=skin_data['outline'],
                                        width=2, tags=f'skin_{skin_id}')
-                
+
                 # Skin name - smaller font
-                self.canvas.create_text(x, current_y + 40, text=skin_data['name'], 
-                                       fill='yellow', font=('Arial', 7, 'bold'), 
+                self.canvas.create_text(x, current_y + 40, text=skin_data['name'],
+                                       fill='yellow', font=('Arial', 7, 'bold'),
                                        tags=f'skin_{skin_id}', width=90)
-                
+
                 # Show "EQUIPPED" if current
                 if skin_id == self.current_skin:
-                    self.canvas.create_text(x, current_y + 60, text="EQUIPPED", 
+                    self.canvas.create_text(x, current_y + 60, text="EQUIPPED",
                                            fill='cyan', font=('Arial', 7, 'bold'), tags=f'skin_{skin_id}')
-                
+
                 # Bind click to equip skin
-                self.canvas.tag_bind(f'skin_{skin_id}', '<Button-1>', 
+                self.canvas.tag_bind(f'skin_{skin_id}', '<Button-1>',
                                     lambda e, s=skin_id: self.equip_skin(s))
             else:
                 # Locked skin
-                self.canvas.create_text(x, current_y + 20, text="🔒", 
+                self.canvas.create_text(x, current_y + 20, text="🔒",
                                        font=('Arial', 20), tags=f'skin_{skin_id}')
-                self.canvas.create_text(x, current_y + 50, text="Locked", 
+                self.canvas.create_text(x, current_y + 50, text="Locked",
                                        fill='gray', font=('Arial', 8), tags=f'skin_{skin_id}')
-            
+
             # Move to next position
             current_x_idx += 1
             if current_x_idx >= skins_per_row:
                 current_x_idx = 0
                 current_y += box_height + 8  # Reduced spacing
-        
+
         # Back button
-        self.canvas.create_rectangle(200, 378, 400, 400, 
-                                     fill='darkgreen', outline='white', 
+        self.canvas.create_rectangle(200, 378, 400, 400,
+                                     fill='darkgreen', outline='white',
                                      width=3, tags='back_button')
-        self.canvas.create_text(300, 390, text="BACK", fill='white', 
+        self.canvas.create_text(300, 390, text="BACK", fill='white',
                                font=('Arial', 10, 'bold'), tags='back_button')
-        
+
         self.canvas.tag_bind('back_button', '<Button-1>', lambda e: self.show_achievements())
-    
+
     def equip_skin(self, skin_id):
         """Equip a skin and save selection"""
         self.current_skin = skin_id
         self.save_achievements()  # Save skin selection
         self.show_skins()  # Refresh display
-    
+
     def start_game(self):
         # Reset game state
         self.game_state = 'playing'
         self.game_running = False
         self.paused = False
-        
+
         # Reset cutscene
         self.in_cutscene = True
         self.cutscene_timer = 0
         self.dialogue_index = 0
-        
+
         # Reset figure/boss
         self.figure_x = self.GAME_WIDTH // 2
         self.figure_y = self.GAME_HEIGHT // 2
         self.boss_hp = 5
-        
+
         # Reset phase
         self.phase = 1
         self.phase2_pattern = 0
@@ -763,22 +763,22 @@ class BulletDodgingGame:
         self.pattern_sub_timer = 0
         self.wave_offset = 0
         self.spiral_angle = 0
-        
+
         # Reset transitions
         self.transitioning_to_phase2 = False
         self.phase2_transition_timer = 0
         self.phase2_dialogue_index = 0
-        
+
         # Reset victory
         self.in_victory = False
         self.victory_timer = 0
         self.victory_dialogue_index = 0
         self.player_disappeared = False
-        
+
         # Reset stars
         self.star_active = False
         self.star_collected = 0
-        
+
         # Reset player
         self.player_x = self.battle_box_x + 20
         self.player_y = self.battle_box_y + self.BATTLE_BOX_HEIGHT - 20
@@ -786,28 +786,28 @@ class BulletDodgingGame:
         self.score = 0
         self.invulnerable = False
         self.invuln_timer = 0
-        
+
         # Reset bullets
         self.bullets = []
-        
+
         # Reset power-ups
         self.power_up_active = False
-        self.power_up_timer = 0
         self.power_up_type = None
-        
+        self.power_up_timer = 0
+
         # Reset particles
         self.healing_particles = []
-        
+
         # Reset achievement tracking
         self.damage_taken_this_game = 0
         self.power_ups_used_this_game = set()
         self.power_ups_collected_this_game = 0
         self.game_start_time = time.time()
-        
+
         # Clear canvas and create UI
         self.canvas.delete('all')
         self.create_ui()
-    
+
     def create_ui(self):
         # Draw battle box
         self.battle_box = self.canvas.create_rectangle(
@@ -816,14 +816,14 @@ class BulletDodgingGame:
             self.battle_box_y + self.BATTLE_BOX_HEIGHT,
             outline='white', width=3, fill='', tags='ui'
         )
-        
+
         # HP bar background
         self.canvas.create_rectangle(45, 45, 250, 70, fill='red', tags='ui')
-        
+
         # Instructions
-        self.canvas.create_text(self.GAME_WIDTH//2, 15, text="WASD/Arrows to move • Survive! • Stars heal you!", 
+        self.canvas.create_text(self.GAME_WIDTH//2, 15, text="WASD/Arrows to move • Survive! • Stars heal you!",
                                fill='white', font=('Arial', 11), tags='ui')
-    
+
     def update_ui(self):
         # Clear old UI
         self.canvas.delete('hp_bar')
@@ -831,43 +831,49 @@ class BulletDodgingGame:
         self.canvas.delete('pattern_text')
         self.canvas.delete('boss_hp_bar')
         self.canvas.delete('phase_text')
-        
+
         # HP bar (green portion)
         hp_width = int(200 * (self.hp / self.max_hp))
         if hp_width > 0:
             self.canvas.create_rectangle(45, 45, 50 + hp_width, 70, fill='lime', tags='hp_bar')
-        
+
         # HP text
-        self.canvas.create_text(150, 58, text=f"HP: {self.hp}/{self.max_hp}", 
+        self.canvas.create_text(150, 58, text=f"HP: {self.hp}/{self.max_hp}",
                                fill='white', font=('Arial', 10, 'bold'), tags='hp_bar')
-        
+
         # Score
-        self.canvas.create_text(400, 60, text=f"Score: {self.score}", 
+        self.canvas.create_text(400, 60, text=f"Score: {self.score}",
                                fill='white', font=('Arial', 12), tags='score_text')
-        
+
         # Power-up indicator
         if self.power_up_active:
             power_up_names = {
                 'speed': '⚡ SPEED BOOST',
                 'shield': '🛡️ SHIELD',
-                'slowmo': '🕐 SLOW-MO'
+                'slowmo': '🕐 SLOW-MO',
+                'clear': '✨ BULLET CLEAR'
             }
             power_up_colors = {
                 'speed': 'yellow',
                 'shield': 'cyan',
-                'slowmo': 'magenta'
+                'slowmo': 'magenta',
+                'clear': 'white'
             }
-            self.canvas.create_text(300, 85, 
+            self.canvas.create_text(300, 85,
                                    text=power_up_names.get(self.power_up_type, ''),
                                    fill=power_up_colors.get(self.power_up_type, 'white'),
                                    font=('Arial', 12, 'bold'), tags='score_text')
-        
+            # Add a countdown for the 'clear' power-up delay
+            if self.power_up_type == 'clear' and self.power_up_timer > 0:
+                self.canvas.create_text(300, 105, text=f"Clear in: {math.ceil(self.power_up_timer / 60)}",
+                                       fill='white', font=('Arial', 10), tags='score_text')
+
         # Phase indicator
         if self.phase == 1:
             pattern_names = ["Spiral", "Wall", "Random", "Cross", "Laser", "Homing", "Wave", "Burst", "Ring", "Snake"]
-            self.canvas.create_text(550, 30, text=f"Pattern: {pattern_names[self.pattern_type]}", 
+            self.canvas.create_text(550, 30, text=f"Pattern: {pattern_names[self.pattern_type]}",
                                    fill='yellow', font=('Arial', 10), tags='pattern_text')
-            self.canvas.create_text(550, 45, text=f"Phase 1 ({self.patterns_completed}/10)", 
+            self.canvas.create_text(550, 45, text=f"Phase 1 ({self.patterns_completed}/10)",
                                    fill='cyan', font=('Arial', 9), tags='phase_text')
         else:
             # Phase 2 - Boss HP bar
@@ -875,32 +881,32 @@ class BulletDodgingGame:
             self.canvas.create_rectangle(150, 25, 450, 50, fill='darkred', outline='white', width=2, tags='boss_hp_bar')
             if boss_hp_width > 0:
                 self.canvas.create_rectangle(150, 25, 150 + boss_hp_width, 50, fill='red', tags='boss_hp_bar')
-            self.canvas.create_text(300, 37, text=f"BOSS HP: {self.boss_hp}/{self.boss_max_hp}", 
+            self.canvas.create_text(300, 37, text=f"BOSS HP: {self.boss_hp}/{self.boss_max_hp}",
                                    fill='white', font=('Arial', 10, 'bold'), tags='boss_hp_bar')
-            
+
             phase2_names = ["Chaos Storm", "Death Spiral", "Void Prison", "Meteor Rain", "Final Judgement"]
-            self.canvas.create_text(525, 30, text=f"Attack: {phase2_names[self.phase2_pattern]}", 
+            self.canvas.create_text(525, 30, text=f"Attack: {phase2_names[self.phase2_pattern]}",
                                    fill='red', font=('Arial', 10, 'bold'), tags='pattern_text')
-            self.canvas.create_text(550, 45, text=f"PHASE 2 ({self.star_collected}/5)", 
+            self.canvas.create_text(550, 45, text=f"PHASE 2 ({self.star_collected}/5)",
                                    fill='magenta', font=('Arial', 9, 'bold'), tags='phase_text')
-    
+
     def key_press(self, event):
         self.keys_pressed.add(event.keysym.lower())
-        
+
         # Track Konami code sequence (in menu only)
         if self.game_state == 'start_menu':
             konami = ['up', 'up', 'down', 'down', 'left', 'right', 'left', 'right']
             self.konami_sequence.append(event.keysym.lower())
-            
+
             # Keep only last 8 keys
             if len(self.konami_sequence) > 8:
                 self.konami_sequence.pop(0)
-            
+
             # Check if sequence matches
             if self.konami_sequence == konami:
                 self.unlock_achievement('secret_konami')
                 self.konami_sequence = []  # Reset
-        
+
         # Press 3 to skip attack
         if event.keysym == '3':
             if self.phase == 1 and self.game_running:
@@ -925,7 +931,7 @@ class BulletDodgingGame:
                 self.skip_phase2_transition()
             elif self.in_victory:
                 self.skip_victory()
-        
+
         # Press 5 to skip to Phase 2 or skip to victory
         if event.keysym == '5':
             if self.phase == 1 and self.game_running:
@@ -936,14 +942,14 @@ class BulletDodgingGame:
                 self.in_victory = True
                 self.victory_timer = 0
 
-        # Press Esc or P to pause        
+        # Press Esc or P to pause
         if event.keysym == 'Escape' or event.keysym == 'p':
             if self.game_running:
                 self.paused = not self.paused  # Toggle pause
-    
+
     def key_release(self, event):
         self.keys_pressed.discard(event.keysym.lower())
-    
+
     def skip_cutscene(self):
         """Skip the opening cutscene"""
         self.in_cutscene = False
@@ -951,21 +957,21 @@ class BulletDodgingGame:
         self.canvas.delete('dialogue')
         self.canvas.delete('figure')
         self.canvas.itemconfig(self.battle_box, outline='white')
-    
+
     def skip_phase2_transition(self):
         """Skip the Phase 2 transition dialogue"""
         self.transitioning_to_phase2 = False
         self.game_running = True
         self.canvas.delete('dialogue')
         self.canvas.itemconfig(self.battle_box, outline='white')
-    
+
     def skip_victory(self):
         """Skip the victory dialogue and go straight to victory screen"""
         self.show_victory_screen()
-    
+
     def move_player(self):
         dx, dy = 0, 0
-        
+
         # Support both WASD and arrow keys
         if 'w' in self.keys_pressed or 'up' in self.keys_pressed:
             dy -= self.player_speed
@@ -975,40 +981,50 @@ class BulletDodgingGame:
             dx -= self.player_speed
         if 'd' in self.keys_pressed or 'right' in self.keys_pressed:
             dx += self.player_speed
-        
+
         # Apply speed power-up
         if self.power_up_active and self.power_up_type == 'speed':
             dx *= 1.5
             dy *= 1.5
-        
+
         # Diagonal movement normalization
         if dx != 0 and dy != 0:
             dx *= 0.707
             dy *= 0.707
-        
+
         # Update position with boundary checking
         new_x = self.player_x + dx
         new_y = self.player_y + dy
-        
+
         # Keep player within battle box
-        if (self.battle_box_x + self.PLAYER_SIZE <= new_x <= 
+        if (self.battle_box_x + self.PLAYER_SIZE <= new_x <=
             self.battle_box_x + self.BATTLE_BOX_WIDTH - self.PLAYER_SIZE):
             self.player_x = new_x
-            
-        if (self.battle_box_y + self.PLAYER_SIZE <= new_y <= 
+
+        if (self.battle_box_y + self.PLAYER_SIZE <= new_y <=
             self.battle_box_y + self.BATTLE_BOX_HEIGHT - self.PLAYER_SIZE):
             self.player_y = new_y
-        
+
         # Update power-up timer
         if self.power_up_active:
             self.power_up_timer -= 1
             if self.power_up_timer <= 0:
-                self.power_up_active = False
-                self.power_up_type = None
-    
+                if self.power_up_type == 'clear':
+                    # Trigger clear effect now that delay is over
+                    self.bullets = []
+                    # Grant temporary invulnerability after clear
+                    self.invulnerable = True
+                    self.invuln_timer = 60 # 1 second invulnerability after clearing
+                    # Power-up is consumed
+                    self.power_up_active = False
+                    self.power_up_type = None
+                else: # For other power-ups, duration ends
+                    self.power_up_active = False
+                    self.power_up_type = None
+
     def handle_cutscene(self):
         self.cutscene_timer += 1
-        
+
         # Display dialogue
         if self.dialogue_index < len(self.dialogue):
             self.canvas.delete('dialogue')
@@ -1017,11 +1033,11 @@ class BulletDodgingGame:
                 text=self.dialogue[self.dialogue_index],
                 fill='white', font=('Arial', 14), tags='dialogue'
             )
-            
+
             # Advance dialogue every 2 seconds
             if self.cutscene_timer % 100 == 0:
                 self.dialogue_index += 1
-                
+
         # Move figure to top after dialogue is complete
         elif self.dialogue_index >= len(self.dialogue):
             if self.figure_y > self.figure_target_y:
@@ -1033,20 +1049,20 @@ class BulletDodgingGame:
                 self.canvas.delete('dialogue')
                 self.canvas.delete('figure')
                 self.canvas.itemconfig(self.battle_box, outline='white')
-    
+
     def handle_phase2_transition(self):
         self.phase2_transition_timer += 1
-        
+
         # Clear all bullets
         if self.phase2_transition_timer == 1:
             self.bullets = []
-        
+
         # Flash effect
         if self.phase2_transition_timer % 20 < 10:
             self.canvas.itemconfig(self.battle_box, outline='red')
         else:
             self.canvas.itemconfig(self.battle_box, outline='purple')
-        
+
         # Display dialogue
         if self.phase2_dialogue_index < len(self.phase2_dialogue):
             self.canvas.delete('dialogue')
@@ -1059,7 +1075,7 @@ class BulletDodgingGame:
                 text=text,
                 fill='red', font=('Arial', 14, 'bold'), tags='dialogue'
             )
-            
+
             if self.phase2_transition_timer % 120 == 0:
                 self.phase2_dialogue_index += 1
         else:
@@ -1069,21 +1085,21 @@ class BulletDodgingGame:
                 self.game_running = True
                 self.canvas.delete('dialogue')
                 self.canvas.itemconfig(self.battle_box, outline='white')
-    
+
     def handle_victory(self):
         self.victory_timer += 1
-        
+
         # Clear bullets
         if self.victory_timer == 1:
             self.bullets = []
             self.player_disappeared = True  # Make player disappear
-        
+
         # Victory flash
         if self.victory_timer % 30 < 15:
             self.canvas.itemconfig(self.battle_box, outline='gold')
         else:
             self.canvas.itemconfig(self.battle_box, outline='yellow')
-        
+
         # Display victory dialogue
         if self.victory_dialogue_index < len(self.victory_dialogue):
             self.canvas.delete('dialogue')
@@ -1095,65 +1111,65 @@ class BulletDodgingGame:
                 text=text,
                 fill='gold', font=('Arial', 14, 'bold'), tags='dialogue'
             )
-            
+
             if self.victory_timer % 120 == 0:
                 self.victory_dialogue_index += 1
         else:
             # Show victory screen
             if self.victory_timer > 360:
                 self.show_victory_screen()
-    
+
     def show_victory_screen(self):
         self.game_running = False
         self.in_victory = False
         self.game_state = 'victory'
         self.canvas.delete('all')
-        
+
         # Check victory achievements
         self.check_victory_achievements()
-        
+
         self.canvas.create_rectangle(80, 80, 520, 320, fill='black', outline='gold', width=4, tags='victory')
-        self.canvas.create_text(300, 120, text="VICTORY!", fill='gold', 
+        self.canvas.create_text(300, 120, text="VICTORY!", fill='gold',
                                font=('Arial', 32, 'bold'), tags='victory')
-        self.canvas.create_text(300, 160, text=f"Final Score: {self.score}", 
+        self.canvas.create_text(300, 160, text=f"Final Score: {self.score}",
                                fill='white', font=('Arial', 18), tags='victory')
-        self.canvas.create_text(300, 190, text="You have defeated the boss!", 
+        self.canvas.create_text(300, 190, text="You have defeated the boss!",
                                fill='yellow', font=('Arial', 14), tags='victory')
-        self.canvas.create_text(300, 220, text="Phase 1: All 10 patterns survived", 
+        self.canvas.create_text(300, 220, text="Phase 1: All 10 patterns survived",
                                fill='cyan', font=('Arial', 11), tags='victory')
-        self.canvas.create_text(300, 240, text="Phase 2: All 5 ultimate attacks defeated", 
+        self.canvas.create_text(300, 240, text="Phase 2: All 5 ultimate attacks defeated",
                                fill='magenta', font=('Arial', 11), tags='victory')
-        
+
         # Show newly unlocked achievements
         if self.newly_unlocked:
             unlock_count = len(self.newly_unlocked)
-            self.canvas.create_text(300, 265, text=f"🏆 {unlock_count} Achievement{'s' if unlock_count != 1 else ''} Unlocked!", 
+            self.canvas.create_text(300, 265, text=f"🏆 {unlock_count} Achievement{'s' if unlock_count != 1 else ''} Unlocked!",
                                    fill='gold', font=('Arial', 12, 'bold'), tags='victory')
-        
+
         # Return to menu button
-        self.canvas.create_rectangle(200, 280, 400, 310, 
-                                     fill='darkgreen', outline='white', 
+        self.canvas.create_rectangle(200, 280, 400, 310,
+                                     fill='darkgreen', outline='white',
                                      width=2, tags='menu_button')
-        self.canvas.create_text(300, 295, text="RETURN TO MENU", fill='white', 
+        self.canvas.create_text(300, 295, text="RETURN TO MENU", fill='white',
                                font=('Arial', 12, 'bold'), tags='menu_button')
-        
+
         # Bind the button properly
         self.canvas.tag_bind('menu_button', '<Button-1>', lambda e: self.show_start_menu())
-    
-    
+
+
     def update_menu_background(self):
         """Create spiral bullet pattern in background of menu"""
         self.menu_animation_timer += 1
-        
+
         # Create spiral pattern bullets
         if self.menu_animation_timer % 12 == 0:
             center_x = self.GAME_WIDTH // 2
             center_y = self.GAME_HEIGHT // 2
-            
+
             for i in range(6):
                 angle = (self.spiral_angle + i * math.pi / 3) % (2 * math.pi)
                 speed = 1.2
-                
+
                 self.menu_bullets.append({
                     'x': center_x,
                     'y': center_y,
@@ -1163,25 +1179,25 @@ class BulletDodgingGame:
                     'alpha': 0.5  # Semi-transparent effect
                 })
             self.spiral_angle += 0.1
-        
+
         # Update menu bullet positions
         bullets_to_remove = []
         for i, bullet in enumerate(self.menu_bullets):
             bullet['x'] += bullet['dx']
             bullet['y'] += bullet['dy']
-            
+
             # Remove bullets that go off screen
             if (bullet['x'] < -20 or bullet['x'] > self.GAME_WIDTH + 20 or
                 bullet['y'] < -20 or bullet['y'] > self.GAME_HEIGHT + 20):
                 bullets_to_remove.append(i)
-        
+
         for i in reversed(bullets_to_remove):
             del self.menu_bullets[i]
-    
+
     def draw_menu_background(self):
         """Draw the background bullets on menu"""
         self.canvas.delete('menu_bg')
-        
+
         for bullet in self.menu_bullets:
             self.canvas.create_oval(
                 bullet['x'] - 3,
@@ -1190,25 +1206,25 @@ class BulletDodgingGame:
                 bullet['y'] + 3,
                 fill=bullet['color'], outline='', tags='menu_bg'
             )
-        
+
         # Lower the menu_bg layer so it's behind the menu
         self.canvas.tag_lower('menu_bg')
-    
+
     def create_bullet_pattern(self):
         self.pattern_timer += 1
         self.pattern_sub_timer += 1
-        
+
         if self.phase == 1:
             # Change pattern every 4 seconds
             if self.pattern_timer % 240 == 0:
                 self.pattern_type = (self.pattern_type + 1) % 10
                 self.pattern_sub_timer = 0
                 self.patterns_completed += 1
-                
+
                 # Check if Phase 1 complete
                 if self.patterns_completed >= 10:
                     self.start_phase2_transition()
-            
+
             # Phase 1 patterns
             if self.pattern_type == 0:
                 self.enhanced_spiral_pattern()
@@ -1230,7 +1246,7 @@ class BulletDodgingGame:
                 self.ring_pattern()
             elif self.pattern_type == 9:
                 self.snake_pattern()
-        
+
         elif self.phase == 2:
             # Phase 2 attack lasts 6 seconds, then spawn star
             if self.pattern_sub_timer >= 360:
@@ -1248,10 +1264,10 @@ class BulletDodgingGame:
                     self.meteor_rain_pattern()
                 elif self.phase2_pattern == 4:
                     self.final_judgement_pattern()
-    
-    
+
+
     # ==================== ACHIEVEMENT SYSTEM ====================
-    
+
     def save_achievements(self):
         """Save achievements, death count, and skin selection to file"""
         save_data = {
@@ -1260,11 +1276,11 @@ class BulletDodgingGame:
             'current_skin': self.current_skin,
             'developer_unlocked': self.developer_unlocked
         }
-        
+
         # Save only unlocked status for each achievement
         for ach_id, ach_data in self.achievements.items():
             save_data['achievements'][ach_id] = ach_data['unlocked']
-        
+
         try:
             # Save to user's home directory or current directory
             save_path = os.path.expanduser('~/.overstory_save.json')
@@ -1278,58 +1294,58 @@ class BulletDodgingGame:
                     json.dump(save_data, f, indent=2)
             except Exception as e2:
                 print(f"Fallback save also failed: {e2}")
-    
+
     def reset_all_data(self):
         """Reset all achievements, death count, and skin selection"""
         # Reset all achievements to unlocked=False
         for ach in self.achievements.values():
             ach['unlocked'] = False
-        
+
         # Reset tracking variables
         self.death_count = 0
         self.current_skin = 'default'
         self.newly_unlocked = []
         self.developer_unlocked = False
-        
+
         # Save the reset state
         self.save_achievements()
-        
+
         print("All data has been reset!")
-        
+
         # Return to main menu
         self.show_start_menu()
-    
+
     def load_achievements(self):
         """Load achievements, death count, and skin selection from file"""
         save_path = os.path.expanduser('~/.overstory_save.json')
-        
+
         # Try home directory first, then current directory
         if not os.path.exists(save_path):
             save_path = 'overstory_save.json'
-        
+
         if os.path.exists(save_path):
             try:
                 with open(save_path, 'r') as f:
                     save_data = json.load(f)
-                
+
                 # Load achievement unlocked status
                 for ach_id, unlocked in save_data.get('achievements', {}).items():
                     if ach_id in self.achievements:
                         self.achievements[ach_id]['unlocked'] = unlocked
-                
+
                 # Load death count
                 self.death_count = save_data.get('death_count', 0)
 
                 # Load developer unlock
                 self.developer_unlocked = save_data.get('developer_unlocked', False)
-                
+
                 # Load skin selection
                 self.current_skin = save_data.get('current_skin', 'default')
-                
+
                 print(f"Loaded achievements: {sum(1 for a in self.achievements.values() if a['unlocked'])}/{len(self.achievements)} unlocked")
             except Exception as e:
                 print(f"Failed to load achievements: {e}")
-    
+
     def unlock_achievement(self, achievement_id):
         """Unlock an achievement and show popup"""
         if achievement_id in self.achievements and not self.achievements[achievement_id]['unlocked']:
@@ -1338,98 +1354,98 @@ class BulletDodgingGame:
             self.show_achievement_popup = True
             self.achievement_popup_timer = 180  # 3 seconds
             self.achievement_popup_achievement = achievement_id
-            
+
             # Save achievements immediately when unlocked
             self.save_achievements()
-            
+
             # Check if all non-hidden achievements are unlocked (excluding The Collector itself)
-            non_hidden_achievements = [ach_id for ach_id, ach in self.achievements.items() 
+            non_hidden_achievements = [ach_id for ach_id, ach in self.achievements.items()
                                       if not ach['hidden'] or ach_id == 'the_collector']
             all_non_hidden_unlocked = all(
-                self.achievements[ach_id]['unlocked'] 
-                for ach_id in non_hidden_achievements 
+                self.achievements[ach_id]['unlocked']
+                for ach_id in non_hidden_achievements
                 if ach_id != 'the_collector'
             )
-            
+
             if all_non_hidden_unlocked and not self.achievements['the_collector']['unlocked']:
                 self.unlock_achievement('the_collector')
-            
+
             print(f"Achievement Unlocked: {self.achievements[achievement_id]['name']}")
             if self.achievements[achievement_id]['reward']:
                 print(f"  Reward: {self.skins[self.achievements[achievement_id]['reward']]['name']} skin unlocked!")
-    
-    
+
+
     def check_achievements(self):
         """Check and unlock achievements based on game state"""
         # Untouchable (Phase 1 without damage)
         if self.patterns_completed >= 10 and self.damage_taken_this_game == 0:
             self.unlock_achievement('untouchable')
-        
+
         # Star Collector
         if self.star_collected >= 3:
             self.unlock_achievement('star_collector')
-        
+
         # Star Master (all 5 stars)
         if self.star_collected >= 5:
             self.unlock_achievement('star_master')
-        
+
         # Power User
-        if len(self.power_ups_used_this_game) >= 3:
+        if len(self.power_ups_used_this_game) >= 4:
             self.unlock_achievement('power_user')
-    
+
     def check_victory_achievements(self):
         """Check achievements when player wins"""
         # Champion
         self.unlock_achievement('champion')
-        
+
         # Flawless Victory
         if self.damage_taken_this_game == 0:
             self.unlock_achievement('flawless_victory')
-        
+
         # Close Call (5 HP or less)
         if self.hp <= 5:
             self.unlock_achievement('close_call')
-        
+
         # Lucky Seven (exactly 7 HP)
         if self.hp == 7:
             self.unlock_achievement('lucky_seven')
-        
+
         # Glass Cannon (took 15+ hits but still won)
         if self.damage_taken_this_game >= 15:
             self.unlock_achievement('glass_cannon')
-        
+
         # Speed Demon
         game_time = time.time() - self.game_start_time
         if game_time < 300:  # 5 minutes
             self.unlock_achievement('speed_demon')
-        
+
         # Slowpoke (5+ minutes)
         if game_time >= 300:  # 5 minutes or more
             self.unlock_achievement('secret_slowpoke')
-        
+
         # No Shield (didn't use shield power-up)
         if 'shield' not in self.power_ups_used_this_game:
             self.unlock_achievement('secret_no_shield')
-    
+
     def draw_achievement_popup(self):
         """Draw achievement unlock popup in bottom left"""
         if self.show_achievement_popup and self.achievement_popup_achievement:
             ach = self.achievements[self.achievement_popup_achievement]
-            
+
             # Popup box in bottom left - made smaller
             popup_x = 10
-            popup_y = self.GAME_HEIGHT - 60  # Moved up slightly
-            popup_width = 220  # Reduced from 280
-            popup_height = 50  # Reduced from 70
-            
+            popup_y = self.GAME_HEIGHT - 60
+            popup_width = 220
+            popup_height = 50
+
             self.canvas.create_rectangle(popup_x, popup_y, popup_x + popup_width, popup_y + popup_height,
                                          fill='black', outline='gold', width=2, tags='achievement_popup')
-            
+
             # Achievement unlocked text - smaller font
-            self.canvas.create_text(popup_x + popup_width // 2, popup_y + 10, 
+            self.canvas.create_text(popup_x + popup_width // 2, popup_y + 10,
                                    text="ACHIEVEMENT!",
                                    fill='gold', font=('Arial', 8, 'bold'), tags='achievement_popup')
-            
+
             # Icon and name - more compact
             self.canvas.create_text(popup_x + 20, popup_y + 32, text=ach['icon'],
                                    font=('Arial', 18), tags='achievement_popup')
@@ -1437,19 +1453,19 @@ class BulletDodgingGame:
                                    fill='yellow', font=('Arial', 9, 'bold'), tags='achievement_popup')
             self.canvas.create_text(popup_x + 110, popup_y + 42, text=ach['description'],
                                    fill='white', font=('Arial', 7), tags='achievement_popup')
-            
+
             # Show skin reward if applicable - smaller
             if ach['reward']:
                 self.canvas.create_text(popup_x + popup_width - 15, popup_y + 32, text="🎨",
                                        font=('Arial', 14), tags='achievement_popup')
-            
+
             # Update timer
             self.achievement_popup_timer -= 1
             if self.achievement_popup_timer <= 0:
                 self.show_achievement_popup = False
                 self.achievement_popup_achievement = None
                 self.canvas.delete('achievement_popup')
-    
+
     def start_phase2_transition(self):
         self.game_running = False
         self.transitioning_to_phase2 = True
@@ -1457,36 +1473,36 @@ class BulletDodgingGame:
         self.phase2_transition_timer = 0
         self.pattern_timer = 0
         self.pattern_sub_timer = 0
-        
+
         # Check Phase 1 achievements
         self.unlock_achievement('first_blood')
         self.check_achievements()
-    
+
     def spawn_star(self):
         self.star_active = True
         # Random position in battle box
-        self.star_x = random.randint(self.battle_box_x + 30, 
+        self.star_x = random.randint(self.battle_box_x + 30,
                                      self.battle_box_x + self.BATTLE_BOX_WIDTH - 30)
-        self.star_y = random.randint(self.battle_box_y + 30, 
+        self.star_y = random.randint(self.battle_box_y + 30,
                                      self.battle_box_y + self.BATTLE_BOX_HEIGHT - 30)
         # Stop spawning bullets
         self.bullets = []
-    
+
     def check_star_collection(self):
         if not self.star_active:
             return
-        
+
         dx = self.player_x - self.star_x
         dy = self.player_y - self.star_y
         distance = math.sqrt(dx**2 + dy**2)
-        
+
         if distance < (self.PLAYER_SIZE + self.STAR_SIZE) // 2:
             # Star collected!
             self.star_active = False
             self.star_collected += 1
             self.boss_hp -= 1
             self.score += 500
-            
+
             # Check if this is the final star (boss defeated)
             if self.boss_hp <= 0:
                 # Don't give power-up on final star
@@ -1503,8 +1519,8 @@ class BulletDodgingGame:
                 # Heal player by 3 HP (but don't exceed max HP)
                 old_hp = self.hp
                 self.hp = min(self.hp + 3, self.max_hp)
-                
-                
+
+
                 # Create healing particles
                 if self.hp > old_hp:
                     for _ in range(15):
@@ -1518,37 +1534,40 @@ class BulletDodgingGame:
                             'life': 30,
                             'color': 'lime'
                         })
-                
+
                 # Random power-up!
-                power_ups = ['speed', 'shield', 'slowmo']
+                power_ups = ['speed', 'shield', 'slowmo', 'clear']
                 self.power_up_type = random.choice(power_ups)
                 self.power_up_active = True
-                self.power_up_timer = 180  # 3 seconds at 60fps
-                
+                if self.power_up_type == 'clear':
+                    self.power_up_timer = 120  # 2 seconds delay before effect (60 FPS * 2)
+                else:
+                    self.power_up_timer = 180  # 3 seconds duration for other power-ups (60 FPS * 3)
+
                 # Track power-up for achievements
                 self.power_ups_used_this_game.add(self.power_up_type)
                 self.power_ups_collected_this_game += 1
-                
+
                 # Check achievements
                 self.check_achievements()
-                
+
                 # Next attack
                 self.phase2_pattern = (self.phase2_pattern + 1) % 5
                 self.pattern_sub_timer = 0
                 self.pattern_timer = 0
-    
+
     # ==================== PHASE 2 ATTACK PATTERNS ====================
-    
+
     def chaos_storm_pattern(self):
         # Massive random bullet spam from all directions - bullets match player skin!
         if self.pattern_timer % 4 == 0:
             # Get current skin color
             skin = self.skins[self.current_skin]
             bullet_color = skin['color']
-            
+
             for _ in range(2):
                 edge = random.choice(['top', 'bottom', 'left', 'right'])
-                
+
                 if edge == 'top':
                     x = random.randint(self.battle_box_x, self.battle_box_x + self.BATTLE_BOX_WIDTH)
                     y = self.battle_box_y
@@ -1565,7 +1584,7 @@ class BulletDodgingGame:
                     x = self.battle_box_x + self.BATTLE_BOX_WIDTH
                     y = random.randint(self.battle_box_y, self.battle_box_y + self.BATTLE_BOX_HEIGHT)
                     angle = random.uniform(2*math.pi/3, 4*math.pi/3)
-                
+
                 speed = random.uniform(2.0, 3.0)
                 self.bullets.append({
                     'x': x, 'y': y,
@@ -1574,18 +1593,18 @@ class BulletDodgingGame:
                     'color': bullet_color,
                     'size': 10
                 })
-    
+
     def death_spiral_pattern(self):
         # Multiple fast spirals from center (NERFED)
         if self.pattern_timer % 8 == 0:
             center_x = self.GAME_WIDTH // 2
             center_y = self.GAME_HEIGHT // 2
-            
+
             for spiral in range(4):
                 for i in range(8):
                     angle = (self.spiral_angle + i * math.pi / 3 + spiral * math.pi) % (2 * math.pi)
                     speed = 2.0 + math.sin(self.pattern_timer * 0.03) * 0.5
-                    
+
                     self.bullets.append({
                         'x': center_x,
                         'y': center_y,
@@ -1594,13 +1613,13 @@ class BulletDodgingGame:
                         'color': ['purple', 'magenta', 'violet', 'pink'][spiral]
                     })
             self.spiral_angle += 0.15
-    
+
     def void_prison_pattern(self):
         # Bullets from edges moving to center, creating a cage (BUFFED)
         if self.pattern_timer % 8 == 0:
             center_x = self.GAME_WIDTH // 2
             center_y = self.GAME_HEIGHT // 2
-            
+
             # From all four sides (spawn 2 bullets per side now)
             for i in range(4):
                 for offset in [0, self.BATTLE_BOX_WIDTH // 4]:
@@ -1616,34 +1635,34 @@ class BulletDodgingGame:
                     else:  # Right
                         x = self.battle_box_x + self.BATTLE_BOX_WIDTH
                         y = self.battle_box_y + (self.pattern_sub_timer * 10 + offset) % self.BATTLE_BOX_HEIGHT
-                    
+
                     dx = (center_x - x) * 0.015
                     dy = (center_y - y) * 0.015
-                    
+
                     self.bullets.append({
                         'x': x, 'y': y,
                         'dx': dx, 'dy': dy,
                         'color': 'cyan'
                     })
-    
+
     def meteor_rain_pattern(self):
         # Large bullets falling from top with homing
         if self.pattern_timer % 20 == 0:
-            x = random.randint(self.battle_box_x + 20, 
+            x = random.randint(self.battle_box_x + 20,
                              self.battle_box_x + self.BATTLE_BOX_WIDTH - 20)
             y = self.battle_box_y - 20
-            
+
             dx_to_player = self.player_x - x
             dy_to_player = self.player_y - y
             distance = math.sqrt(dx_to_player**2 + dy_to_player**2)
-            
+
             if distance > 0:
                 speed = 7
                 dx = (dx_to_player / distance) * speed
                 dy = (dy_to_player / distance) * speed
             else:
                 dx, dy = 0, 5
-            
+
             self.bullets.append({
                 'x': x, 'y': y,
                 'dx': dx, 'dy': dy,
@@ -1651,13 +1670,13 @@ class BulletDodgingGame:
                 'type': 'meteor',
                 'size': 50
             })
-    
+
     def final_judgement_pattern(self):
         # Combination of multiple attacks
         if self.pattern_timer % 15 == 0:
             center_x = self.GAME_WIDTH // 2
             center_y = self.GAME_HEIGHT // 2
-            
+
             # Ring
             for i in range(12):
                 angle = i * 2 * math.pi / 12 + self.pattern_timer * 0.02
@@ -1669,11 +1688,11 @@ class BulletDodgingGame:
                     'dy': math.sin(angle) * speed,
                     'color': 'gold'
                 })
-        
+
         # Homing bullets
         if self.pattern_timer % 40 == 0:
             edge = random.choice(['top', 'bottom', 'left', 'right'])
-            
+
             if edge == 'top':
                 x = random.randint(self.battle_box_x, self.battle_box_x + self.BATTLE_BOX_WIDTH)
                 y = self.battle_box_y
@@ -1686,29 +1705,29 @@ class BulletDodgingGame:
             else:
                 x = self.battle_box_x + self.BATTLE_BOX_WIDTH
                 y = random.randint(self.battle_box_y, self.battle_box_y + self.BATTLE_BOX_HEIGHT)
-            
+
             dx_to_player = self.player_x - x
             dy_to_player = self.player_y - y
             distance = math.sqrt(dx_to_player**2 + dy_to_player**2)
-            
+
             if distance > 0:
                 dx = (dx_to_player / distance) * 0.5
                 dy = (dy_to_player / distance) * 0.5
             else:
                 dx, dy = 1, 0
-            
+
             self.bullets.append({
-                'x': x, 'y': y, 'dx': dx, 'dy': dy, 
+                'x': x, 'y': y, 'dx': dx, 'dy': dy,
                 'color': 'red', 'type': 'homing'
             })
-    
+
     # ==================== PHASE 1 ATTACK PATTERNS ====================
-    
+
     def enhanced_spiral_pattern(self):
         if self.pattern_timer % 12 == 0:
             center_x = self.GAME_WIDTH // 2
             center_y = self.GAME_HEIGHT // 2
-            
+
             for spiral in range(2):
                 for i in range(6):
                     self.spiral_angle += 0.1
@@ -1716,7 +1735,7 @@ class BulletDodgingGame:
                     speed = 1.5 + math.sin(self.pattern_timer * 0.02) * 0.5
                     dx = math.cos(angle) * speed
                     dy = math.sin(angle) * speed
-                    
+
                     self.bullets.append({
                         'x': center_x,
                         'y': center_y,
@@ -1724,7 +1743,7 @@ class BulletDodgingGame:
                         'dy': dy,
                         'color': 'orange' if spiral == 0 else 'pink'
                     })
-    
+
     def laser_pattern(self):
         if self.pattern_sub_timer < 60:
             if self.pattern_sub_timer % 10 == 0:
@@ -1732,7 +1751,7 @@ class BulletDodgingGame:
                     angle = i * math.pi / 2 + self.pattern_sub_timer * 0.05
                     start_x = self.GAME_WIDTH // 2 + math.cos(angle) * 50
                     start_y = self.GAME_HEIGHT // 2 + math.sin(angle) * 50
-                    
+
                     self.bullets.append({
                         'x': start_x,
                         'y': start_y,
@@ -1741,18 +1760,18 @@ class BulletDodgingGame:
                         'color': 'white',
                         'life': 30
                     })
-        
+
         elif self.pattern_sub_timer == 60:
             center_x = self.GAME_WIDTH // 2
             center_y = self.GAME_HEIGHT // 2
-            
+
             for i in range(8):
                 angle = i * math.pi / 4
                 for j in range(15):
                     distance = j * 8
                     x = center_x + math.cos(angle) * distance
                     y = center_y + math.sin(angle) * distance
-                    
+
                     self.bullets.append({
                         'x': x,
                         'y': y,
@@ -1761,11 +1780,11 @@ class BulletDodgingGame:
                         'color': 'cyan',
                         'life': 120
                     })
-    
+
     def homing_pattern(self):
         if self.pattern_timer % 20 == 0:
             edge = random.choice(['top', 'bottom', 'left', 'right'])
-            
+
             if edge == 'top':
                 x = random.randint(self.battle_box_x, self.battle_box_x + self.BATTLE_BOX_WIDTH)
                 y = self.battle_box_y
@@ -1778,57 +1797,57 @@ class BulletDodgingGame:
             else:
                 x = self.battle_box_x + self.BATTLE_BOX_WIDTH
                 y = random.randint(self.battle_box_y, self.battle_box_y + self.BATTLE_BOX_HEIGHT)
-            
+
             dx_to_player = self.player_x - x
             dy_to_player = self.player_y - y
             distance = math.sqrt(dx_to_player**2 + dy_to_player**2)
-            
+
             if distance > 0:
                 dx = (dx_to_player / distance) * 4
                 dy = (dy_to_player / distance) * 4
             else:
                 dx, dy = 1, 0
-            
+
             self.bullets.append({
-                'x': x, 'y': y, 'dx': dx, 'dy': dy, 
+                'x': x, 'y': y, 'dx': dx, 'dy': dy,
                 'color': 'magenta', 'type': 'homing',
                 'life': 200
             })
-    
+
     def wave_pattern(self):
         if self.pattern_timer % 8 == 0:
             self.wave_offset += 0.2
-            
+
             for side in ['top', 'bottom']:
                 x = self.battle_box_x + (self.pattern_sub_timer * 3) % self.BATTLE_BOX_WIDTH
-                
+
                 if side == 'top':
                     y = self.battle_box_y
                     base_dy = 2
                 else:
                     y = self.battle_box_y + self.BATTLE_BOX_HEIGHT
                     base_dy = -2
-                
+
                 wave_dx = math.sin(self.wave_offset + x * 0.02) * 1.5
-                
+
                 self.bullets.append({
-                    'x': x, 'y': y, 
+                    'x': x, 'y': y,
                     'dx': wave_dx, 'dy': base_dy,
                     'color': 'lime' if side == 'top' else 'yellow'
                 })
-    
+
     def burst_pattern(self):
         if self.pattern_sub_timer % 90 == 0:
             for _ in range(3):
-                burst_x = random.randint(self.battle_box_x + 50, 
+                burst_x = random.randint(self.battle_box_x + 50,
                                        self.battle_box_x + self.BATTLE_BOX_WIDTH - 50)
-                burst_y = random.randint(self.battle_box_y + 50, 
+                burst_y = random.randint(self.battle_box_y + 50,
                                        self.battle_box_y + self.BATTLE_BOX_HEIGHT - 50)
-                
+
                 for i in range(12):
                     angle = i * math.pi / 6
                     speed = random.uniform(1.5, 2.5)
-                    
+
                     self.bullets.append({
                         'x': burst_x,
                         'y': burst_y,
@@ -1836,22 +1855,22 @@ class BulletDodgingGame:
                         'dy': math.sin(angle) * speed,
                         'color': 'red'
                     })
-    
+
     def ring_pattern(self):
         if self.pattern_sub_timer % 40 == 0:
             center_x = self.GAME_WIDTH // 2
             center_y = self.GAME_HEIGHT // 2
-            
+
             for ring in range(2):
                 ring_bullets = 16 + ring * 4
                 for i in range(ring_bullets):
                     angle = (i * 2 * math.pi / ring_bullets) + (self.pattern_sub_timer * 0.02)
                     speed = 1.8 + ring * 0.3
-                    
+
                     start_radius = 30 + ring * 20
                     start_x = center_x + math.cos(angle) * start_radius
                     start_y = center_y + math.sin(angle) * start_radius
-                    
+
                     self.bullets.append({
                         'x': start_x,
                         'y': start_y,
@@ -1859,7 +1878,7 @@ class BulletDodgingGame:
                         'dy': math.sin(angle) * speed,
                         'color': 'purple' if ring == 0 else 'blue'
                     })
-    
+
     def snake_pattern(self):
         if self.pattern_timer % 6 == 0:
             for side in ['left', 'right']:
@@ -1869,26 +1888,26 @@ class BulletDodgingGame:
                 else:
                     x = self.battle_box_x + self.BATTLE_BOX_WIDTH
                     base_dx = -2.5
-                
-                y = (self.battle_box_y + self.BATTLE_BOX_HEIGHT // 2 + 
+
+                y = (self.battle_box_y + self.BATTLE_BOX_HEIGHT // 2 +
                      math.sin(self.pattern_sub_timer * 0.1) * 100)
-                
+
                 y = max(self.battle_box_y, min(y, self.battle_box_y + self.BATTLE_BOX_HEIGHT))
-                
+
                 dy = math.cos(self.pattern_sub_timer * 0.1) * 0.5
-                
+
                 self.bullets.append({
-                    'x': x, 'y': y, 
+                    'x': x, 'y': y,
                     'dx': base_dx, 'dy': dy,
                     'color': 'orange' if side == 'left' else 'cyan'
                 })
-    
+
     def wall_pattern(self):
         if random.random() < 0.3:
             side = random.choice(['left', 'right', 'top', 'bottom'])
-            
+
             if side == 'left':
-                x, y = self.battle_box_x, random.randint(self.battle_box_y, 
+                x, y = self.battle_box_x, random.randint(self.battle_box_y,
                                                         self.battle_box_y + self.BATTLE_BOX_HEIGHT)
                 dx, dy = 2, 0
             elif side == 'right':
@@ -1896,22 +1915,22 @@ class BulletDodgingGame:
                     self.battle_box_y, self.battle_box_y + self.BATTLE_BOX_HEIGHT)
                 dx, dy = -2, 0
             elif side == 'top':
-                x, y = random.randint(self.battle_box_x, 
+                x, y = random.randint(self.battle_box_x,
                                      self.battle_box_x + self.BATTLE_BOX_WIDTH), self.battle_box_y
                 dx, dy = 0, 2
             else:
-                x, y = random.randint(self.battle_box_x, 
+                x, y = random.randint(self.battle_box_x,
                                      self.battle_box_x + self.BATTLE_BOX_WIDTH), self.battle_box_y + self.BATTLE_BOX_HEIGHT
                 dx, dy = 0, -2
-            
+
             self.bullets.append({
                 'x': x, 'y': y, 'dx': dx, 'dy': dy, 'color': 'cyan'
             })
-    
+
     def random_pattern(self):
         if random.random() < 0.55:
             edge = random.choice(['top', 'bottom', 'left', 'right'])
-            
+
             if edge == 'top':
                 x = random.randint(self.battle_box_x, self.battle_box_x + self.BATTLE_BOX_WIDTH)
                 y = self.battle_box_y
@@ -1928,27 +1947,27 @@ class BulletDodgingGame:
                 x = self.battle_box_x + self.BATTLE_BOX_WIDTH
                 y = random.randint(self.battle_box_y, self.battle_box_y + self.BATTLE_BOX_HEIGHT)
                 angle = random.uniform(3*math.pi/4, 5*math.pi/4)
-            
+
             speed = random.uniform(1.5, 3)
             dx = math.cos(angle) * speed
             dy = math.sin(angle) * speed
-            
+
             self.bullets.append({
                 'x': x, 'y': y, 'dx': dx, 'dy': dy, 'color': 'red', 'life': 200
             })
-    
+
     def cross_pattern(self):
         center_x = self.GAME_WIDTH // 2
         center_y = self.GAME_HEIGHT // 2
-        
+
         if self.pattern_timer % 30 == 0:
             directions = [(1,0), (-1,0), (0,1), (0,-1), (1,1), (-1,-1), (1,-1), (-1,1)]
-            
+
             for dx, dy in directions:
                 if dx != 0 and dy != 0:
                     dx *= 0.707
                     dy *= 0.707
-                
+
                 self.bullets.append({
                     'x': center_x,
                     'y': center_y,
@@ -1956,69 +1975,69 @@ class BulletDodgingGame:
                     'dy': dy * 2.5,
                     'color': 'yellow'
                 })
-    
+
     # ==================== BULLET/COLLISION UPDATES ====================
-    
+
     def update_bullets(self):
         bullets_to_remove = []
-        
+
         # Slow-mo power-up effect
         slowmo_factor = 0.5 if (self.power_up_active and self.power_up_type == 'slowmo') else 1.0
-        
+
         for i, bullet in enumerate(self.bullets):
             if bullet.get('type') == 'homing':
                 dx_to_player = self.player_x - bullet['x']
                 dy_to_player = self.player_y - bullet['y']
                 distance = math.sqrt(dx_to_player**2 + dy_to_player**2)
-                
+
                 if distance > 0:
                     homing_strength = 0.3
                     bullet['dx'] += (dx_to_player / distance) * homing_strength
                     bullet['dy'] += (dy_to_player / distance) * homing_strength
-                    
+
                     speed = math.sqrt(bullet['dx']**2 + bullet['dy']**2)
                     if speed > 5:
                         bullet['dx'] = (bullet['dx'] / speed) * 5
                         bullet['dy'] = (bullet['dy'] / speed) * 5
-            
+
             # Apply slowmo to bullet movement
             bullet['x'] += bullet['dx'] * slowmo_factor
             bullet['y'] += bullet['dy'] * slowmo_factor
-            
+
             if 'life' in bullet:
                 bullet['life'] -= 1
                 if bullet['life'] <= 0:
                     bullets_to_remove.append(i)
                     continue
-            
+
             if (bullet['x'] < -50 or bullet['x'] > self.GAME_WIDTH + 50 or
                 bullet['y'] < -50 or bullet['y'] > self.GAME_HEIGHT + 50):
                 bullets_to_remove.append(i)
-        
+
         for i in reversed(bullets_to_remove):
             del self.bullets[i]
-    
+
     def check_collisions(self):
         if self.invulnerable:
             self.invuln_timer -= 1
             if self.invuln_timer <= 0:
                 self.invulnerable = False
             return
-        
+
         # Shield power-up blocks one hit
         if self.power_up_active and self.power_up_type == 'shield':
-            player_rect = (self.player_x - self.PLAYER_SIZE//2, 
+            player_rect = (self.player_x - self.PLAYER_SIZE//2,
                           self.player_y - self.PLAYER_SIZE//2,
-                          self.player_x + self.PLAYER_SIZE//2, 
+                          self.player_x + self.PLAYER_SIZE//2,
                           self.player_y + self.PLAYER_SIZE//2)
-            
+
             for bullet in self.bullets:
                 bullet_size = bullet.get('size', self.BULLET_SIZE)
-                bullet_rect = (bullet['x'] - bullet_size//2, 
+                bullet_rect = (bullet['x'] - bullet_size//2,
                               bullet['y'] - bullet_size//2,
-                              bullet['x'] + bullet_size//2, 
+                              bullet['x'] + bullet_size//2,
                               bullet['y'] + bullet_size//2)
-                
+
                 if (player_rect[0] < bullet_rect[2] and player_rect[2] > bullet_rect[0] and
                     player_rect[1] < bullet_rect[3] and player_rect[3] > bullet_rect[1]):
                     self.power_up_active = False
@@ -2027,69 +2046,69 @@ class BulletDodgingGame:
                     self.invuln_timer = 10
                     break
             return
-        
-        player_rect = (self.player_x - self.PLAYER_SIZE//2, 
+
+        player_rect = (self.player_x - self.PLAYER_SIZE//2,
                       self.player_y - self.PLAYER_SIZE//2,
-                      self.player_x + self.PLAYER_SIZE//2, 
+                      self.player_x + self.PLAYER_SIZE//2,
                       self.player_y + self.PLAYER_SIZE//2)
-        
+
         for bullet in self.bullets:
             bullet_size = bullet.get('size', self.BULLET_SIZE)
-            bullet_rect = (bullet['x'] - bullet_size//2, 
+            bullet_rect = (bullet['x'] - bullet_size//2,
                           bullet['y'] - bullet_size//2,
-                          bullet['x'] + bullet_size//2, 
+                          bullet['x'] + bullet_size//2,
                           bullet['y'] + bullet_size//2)
-            
+
             if (player_rect[0] < bullet_rect[2] and player_rect[2] > bullet_rect[0] and
                 player_rect[1] < bullet_rect[3] and player_rect[3] > bullet_rect[1]):
-                
+
                 self.hp -= 1
                 self.damage_taken_this_game += 1  # Track damage for achievements
                 self.invulnerable = True
                 self.invuln_timer = 10
-                
+
                 if self.hp <= 0:
                     self.game_over()
                 break
-    
+
     # ==================== RENDERING ====================
-    
+
     def draw_everything(self):
         self.canvas.delete('game_object')
-        
+
         if self.in_cutscene:
             # Draw mysterious boss figure with better appearance and flashing
             self.boss_glow += 0.1
             glow_size = 5 + abs(math.sin(self.boss_glow) * 3)
-            
+
             # Flash effect for outline
             if int(self.cutscene_timer / 15) % 2 == 0:
                 outline_color = 'purple'
             else:
                 outline_color = 'magenta'
-            
+
             # Outer glow (flashing)
             self.canvas.create_oval(
-                self.figure_x - self.boss_size - glow_size, 
+                self.figure_x - self.boss_size - glow_size,
                 self.figure_y - self.boss_size - glow_size,
-                self.figure_x + self.boss_size + glow_size, 
+                self.figure_x + self.boss_size + glow_size,
                 self.figure_y + self.boss_size + glow_size,
                 fill='', outline=outline_color, width=2, tags='figure'
             )
             # Middle layer
             self.canvas.create_oval(
-                self.figure_x - self.boss_size + 5, 
+                self.figure_x - self.boss_size + 5,
                 self.figure_y - self.boss_size + 5,
-                self.figure_x + self.boss_size - 5, 
+                self.figure_x + self.boss_size - 5,
                 self.figure_y + self.boss_size - 5,
                 fill='darkviolet', outline='', tags='figure'
             )
             # Core (also flashes)
             core_color = 'white' if int(self.cutscene_timer / 20) % 2 == 0 else 'light grey'
             self.canvas.create_oval(
-                self.figure_x - self.boss_size // 2, 
+                self.figure_x - self.boss_size // 2,
                 self.figure_y - self.boss_size // 2,
-                self.figure_x + self.boss_size // 2, 
+                self.figure_x + self.boss_size // 2,
                 self.figure_y + self.boss_size // 2,
                 fill=core_color, outline=outline_color, width=2, tags='figure'
             )
@@ -2113,37 +2132,37 @@ class BulletDodgingGame:
                 boss_bg_x = self.GAME_WIDTH // 2
                 boss_bg_y = 60
                 self.boss_glow += 0.1
-                
+
                 # Increase anger as HP decreases
                 self.boss_anger = (self.boss_max_hp - self.boss_hp) * 2
-                
+
                 # Pulsing glow (more intense when lower HP)
                 glow_size = 8 + abs(math.sin(self.boss_glow) * (5 + self.boss_anger))
                 glow_color = 'purple' if self.boss_hp > 2 else 'red'
-                
+
                 # Outer glow
                 self.canvas.create_oval(
                     boss_bg_x - 25 - glow_size, boss_bg_y - 25 - glow_size,
                     boss_bg_x + 25 + glow_size, boss_bg_y + 25 + glow_size,
                     fill='', outline=glow_color, width=3, tags='game_object'
                 )
-                
+
                 # Attack animation
                 if self.phase2_pattern == 0:
                     for i in range(4):
                         angle = i * math.pi / 2 + self.pattern_timer * 0.1
                         x = boss_bg_x + math.cos(angle) * 15
                         y = boss_bg_y + math.sin(angle) * 15
-                        self.canvas.create_oval(x-3, y-3, x+3, y+3, 
+                        self.canvas.create_oval(x-3, y-3, x+3, y+3,
                                               fill='orange', outline='', tags='game_object')
                 elif self.phase2_pattern == 1:
                     for i in range(6):
                         angle = i * math.pi / 3 + self.spiral_angle
                         x = boss_bg_x + math.cos(angle) * 18
                         y = boss_bg_y + math.sin(angle) * 18
-                        self.canvas.create_oval(x-2, y-2, x+2, y+2, 
+                        self.canvas.create_oval(x-2, y-2, x+2, y+2,
                                               fill='magenta', outline='', tags='game_object')
-                
+
                 # Main body
                 body_color = 'darkviolet' if self.boss_hp > 2 else 'darkred'
                 self.canvas.create_oval(
@@ -2151,7 +2170,7 @@ class BulletDodgingGame:
                     boss_bg_x + 20, boss_bg_y + 20,
                     fill=body_color, outline='', tags='game_object'
                 )
-                
+
                 # Core
                 core_color = 'white' if self.boss_hp > 2 else 'white'
                 self.canvas.create_oval(
@@ -2159,12 +2178,12 @@ class BulletDodgingGame:
                     boss_bg_x + 10, boss_bg_y + 10,
                     fill=core_color, outline=glow_color, width=2, tags='game_object'
                 )
-                
+
                 # Eyes
                 eye_y_offset = -3 if self.boss_hp > 2 else -5
                 eye_color = 'red' if self.boss_hp > 2 else 'crimson'
                 eye_size = 3 if self.boss_hp > 2 else 4
-                
+
                 self.canvas.create_oval(
                     boss_bg_x - 6 - eye_size, boss_bg_y + eye_y_offset - eye_size,
                     boss_bg_x - 6 + eye_size, boss_bg_y + eye_y_offset + eye_size,
@@ -2175,7 +2194,7 @@ class BulletDodgingGame:
                     boss_bg_x + 6 + eye_size, boss_bg_y + eye_y_offset + eye_size,
                     fill=eye_color, outline='', tags='game_object'
                 )
-            
+
             # Draw player (unless they've disappeared after victory)
             if not self.player_disappeared:
                 if not self.invulnerable or (self.invulnerable and self.invuln_timer % 10 < 5):
@@ -2206,21 +2225,30 @@ class BulletDodgingGame:
                                 self.player_y + self.PLAYER_SIZE + pulse,
                                 fill='', outline='magenta', width=2, tags='game_object'
                             )
-                    
+                        elif self.power_up_type == 'clear': # Only pulse during delay
+                            pulse = abs(math.sin(self.pattern_timer * 0.4)) * 2
+                            self.canvas.create_oval(
+                                self.player_x - self.PLAYER_SIZE - pulse,
+                                self.player_y - self.PLAYER_SIZE - pulse,
+                                self.player_x + self.PLAYER_SIZE + pulse,
+                                self.player_y + self.PLAYER_SIZE + pulse,
+                                fill='', outline='white', width=2, tags='game_object'
+                            )
+
                     # Player with animated Chromatic skin
                     skin = self.skins[self.current_skin]
-                    
+
                     # Animate Chromatic skin color cycling
                     if skin.get('animated') and self.current_skin == 'skin_chromatic':
                         # Cycle through rainbow colors
                         colors = ['red', 'orange', 'yellow', 'lime', 'cyan', 'blue', 'magenta']
                         color_index = (self.pattern_timer // 10) % len(colors)
                         player_color = colors[color_index]
-                        player_outline = colors[(color_index + 3) % len(colors)]  # Complementary color
+                        player_outline = colors[(color_index + 3) % len(colors)]
                     else:
                         player_color = skin['color']
                         player_outline = skin['outline']
-                    
+
                     self.canvas.create_oval(
                         self.player_x - self.PLAYER_SIZE//2,
                         self.player_y - self.PLAYER_SIZE//2,
@@ -2228,7 +2256,7 @@ class BulletDodgingGame:
                         self.player_y + self.PLAYER_SIZE//2,
                         fill=player_color, outline=player_outline, tags='game_object'
                     )
-            
+
             # Draw healing particles
             for particle in self.healing_particles:
                 self.canvas.create_oval(
@@ -2236,7 +2264,7 @@ class BulletDodgingGame:
                     particle['x'] + 2, particle['y'] + 2,
                     fill=particle['color'], outline='', tags='game_object'
                 )
-        
+
             # Draw bullets
             for bullet in self.bullets:
                 size = bullet.get('size', self.BULLET_SIZE)
@@ -2246,7 +2274,7 @@ class BulletDodgingGame:
                     size = self.BULLET_SIZE + 2
                 elif bullet.get('type') == 'meteor':
                     size = 25
-                
+
                 self.canvas.create_oval(
                     bullet['x'] - size//2,
                     bullet['y'] - size//2,
@@ -2254,7 +2282,7 @@ class BulletDodgingGame:
                     bullet['y'] + size//2,
                     fill=bullet['color'], outline='white', tags='game_object'
                 )
-            
+
             # Draw star if active
             if self.star_active:
                 pulse = math.sin(self.pattern_timer * 0.1) * 2
@@ -2266,61 +2294,61 @@ class BulletDodgingGame:
                     x = self.star_x + math.cos(angle) * radius
                     y = self.star_y + math.sin(angle) * radius
                     points.extend([x, y])
-                
-                self.canvas.create_polygon(points, fill='gold', outline='yellow', 
+
+                self.canvas.create_polygon(points, fill='gold', outline='yellow',
                                           width=2, tags='game_object')
-    
+
     def game_over(self):
         self.game_running = False
         self.game_state = 'game_over'
         self.canvas.delete('all')
-        
+
         # Track death for persistent achievement
         self.death_count += 1
-        self.save_achievements()  # Save death count
-        
+        self.save_achievements()
+
         # Check for persistent achievement
         if self.death_count >= 5:
             self.unlock_achievement('persistent')
-        
+
         self.canvas.create_rectangle(100, 100, 500, 300, fill='black', outline='white', width=3, tags='gameover')
-        self.canvas.create_text(300, 140, text="GAME OVER", fill='red', 
+        self.canvas.create_text(300, 140, text="GAME OVER", fill='red',
                                font=('Arial', 24, 'bold'), tags='gameover')
-        self.canvas.create_text(300, 175, text=f"Final Score: {self.score}", 
+        self.canvas.create_text(300, 175, text=f"Final Score: {self.score}",
                                fill='white', font=('Arial', 16), tags='gameover')
-        
+
         if self.phase == 1:
-            self.canvas.create_text(300, 205, text=f"Phase 1: {self.patterns_completed}/10 patterns completed", 
+            self.canvas.create_text(300, 205, text=f"Phase 1: {self.patterns_completed}/10 patterns completed",
                                    fill='yellow', font=('Arial', 12), tags='gameover')
         else:
-            self.canvas.create_text(300, 205, text=f"Phase 2: {self.star_collected}/5 stars collected", 
+            self.canvas.create_text(300, 205, text=f"Phase 2: {self.star_collected}/5 stars collected",
                                    fill='magenta', font=('Arial', 12), tags='gameover')
-        
-        self.canvas.create_text(300, 235, text="Better luck next time!", 
+
+        self.canvas.create_text(300, 235, text="Better luck next time!",
                                fill='white', font=('Arial', 12), tags='gameover')
-        
+
         # Return to menu button
-        self.canvas.create_rectangle(200, 260, 400, 290, 
-                                     fill='darkgreen', outline='white', 
+        self.canvas.create_rectangle(200, 260, 400, 290,
+                                     fill='darkgreen', outline='white',
                                      width=2, tags='menu_button')
-        self.canvas.create_text(300, 275, text="RETURN TO MENU", fill='white', 
+        self.canvas.create_text(300, 275, text="RETURN TO MENU", fill='white',
                                font=('Arial', 12, 'bold'), tags='menu_button')
-        
+
         # Bind the button properly
         self.canvas.tag_bind('menu_button', '<Button-1>', lambda e: self.show_start_menu())
-    
+
     def draw_pause_menu(self):
         self.canvas.delete('pause')
         # Semi-transparent overlay
         self.canvas.create_rectangle(0, 0, self.GAME_WIDTH, self.GAME_HEIGHT,
                                     fill='black', stipple='gray50', tags='pause')
-        self.canvas.create_text(300, 200, text="PAUSED", 
+        self.canvas.create_text(300, 200, text="PAUSED",
                             fill='yellow', font=('Arial', 36, 'bold'), tags='pause')
         self.canvas.create_text(300, 250, text="Press ESC or P to resume",
                             fill='white', font=('Arial', 14), tags='pause')
-    
+
     # ==================== MAIN GAME LOOP ====================
-    
+
     def game_loop(self):
         if self.game_state == 'start_menu':
             # Animate menu background
@@ -2343,7 +2371,7 @@ class BulletDodgingGame:
                     self.check_star_collection()
                     self.score += 1
                     self.update_ui()
-                    
+
                     # Update healing particles
                     particles_to_remove = []
                     for i, particle in enumerate(self.healing_particles):
@@ -2353,18 +2381,18 @@ class BulletDodgingGame:
                         particle['dy'] += 0.1
                         if particle['life'] <= 0:
                             particles_to_remove.append(i)
-                    
+
                     for i in reversed(particles_to_remove):
                         del self.healing_particles[i]
                 else:
                     self.draw_pause_menu()
-            
+
             self.draw_everything()
-        
+
         # Draw achievement popup (on top of everything)
         if self.game_state == 'playing' and self.show_achievement_popup:
             self.draw_achievement_popup()
-        
+
         self.root.after(16, self.game_loop)
 
 if __name__ == "__main__":
