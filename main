@@ -67,6 +67,7 @@ class BulletDodgingGame:
         # ==================== BULLET VARIABLES ====================
         self.bullets = []
         self.targeting_bullets = []
+        self.total_bullets_spawned = 0
 
         # ==================== CUTSCENE/DIALOGUE VARIABLES ====================
         self.in_cutscene = True
@@ -268,13 +269,13 @@ class BulletDodgingGame:
                 'hidden': True,
                 'reward': 'skin_developer'
             },
-            'new_achievement_3': {
-                'name': 'Third Achievement',
-                'description': 'Even more stuff',
+            'secret_dodger': {
+                'name': 'Bullet Dodger',
+                'description': 'Dodge 5,000 bullets',
                 'unlocked': False,
-                'icon': '🌟',
+                'icon': '🌠',
                 'hidden': True,
-                'reward': 'skin_new_3'
+                'reward': 'skin_comet'
             },
             'secret_cheater': {
                 'name': 'Cheater!',
@@ -322,7 +323,7 @@ class BulletDodgingGame:
             'skin_turtle': {'name': 'Turtle', 'color': 'green', 'outline': 'darkgreen'},  # Slowpoke
             'skin_minimal': {'name': 'Minimalist', 'color': 'gray', 'outline': 'darkgray'},  # Unprotected
             'skin_developer': {'name': 'Developer', 'color': 'brown', 'outline': 'orange'},  # Hidden credits button
-            'skin_new_3': {'name': 'New Skin 3', 'color': 'white', 'outline': 'white'},  # ___
+            'skin_comet': {'name': 'Comet', 'color': 'black', 'outline': 'cyan'},  # Bullet Dodger
             'skin_invisible': {'name': '✨ Invisible', 'color': "#1C1C1C", 'outline': 'black', 'animated': True},  # Invisible
             'skin_platinum': {'name': 'Platinum Collector', 'color': 'white', 'outline': 'silver'},  # The Collector
 
@@ -334,6 +335,8 @@ class BulletDodgingGame:
 
         # Current selected skin
         self.current_skin = 'default'
+
+        
 
         # Achievement tracking variables
         self.newly_unlocked = []  # Achievements unlocked this session
@@ -450,6 +453,8 @@ class BulletDodgingGame:
                                font=('Arial', 12), tags='settings')
         self.canvas.create_text(300, 315, text="• Defeat the boss in Phase 2 by collecting 5 stars", fill='magenta',
                                font=('Arial', 12), tags='settings')
+        self.canvas.create_text(300, 330, text=f"Total Bullets Ever Spawned: {self.total_bullets_spawned}",
+                               fill='yellow', font=('Arial', 10), tags='settings')
 
         # Reset button (red/warning)
         self.canvas.create_rectangle(175, 340, 425, 370,
@@ -1341,6 +1346,7 @@ class BulletDodgingGame:
         self.canvas.tag_lower('menu_bg')
 
     def create_bullet_pattern(self):
+        bullets_before = len(self.bullets)
         self.pattern_timer += 1
         self.pattern_sub_timer += 1
 
@@ -1395,6 +1401,7 @@ class BulletDodgingGame:
                 elif self.phase2_pattern == 4:
                     self.final_judgement_pattern()
 
+        self.total_bullets_spawned += len(self.bullets) - bullets_before
 
     # ==================== ACHIEVEMENT SYSTEM ====================
 
@@ -1403,7 +1410,8 @@ class BulletDodgingGame:
         save_data = {
             'achievements': {},
             'death_count': self.death_count,
-            'current_skin': self.current_skin
+            'current_skin': self.current_skin,
+            'total_bullets_spawned': self.total_bullets_spawned
         }
 
         # Save only unlocked status for each achievement
@@ -1466,6 +1474,9 @@ class BulletDodgingGame:
 
                 # Load skin selection
                 self.current_skin = save_data.get('current_skin', 'default')
+
+                # Load total bullets spawned
+                self.total_bullets_spawned = save_data.get('total_bullets_spawned', 0)
 
                 print(f"Loaded achievements: {sum(1 for a in self.achievements.values() if a['unlocked'])}/{len(self.achievements)} unlocked")
             except Exception as e:
@@ -1564,7 +1575,9 @@ class BulletDodgingGame:
         if self.score >= 10000:
             self.unlock_achievement('high_scorer')
         
-        self.unlock_achievement('new_achievement_3')
+        # Dodge 5,000 bullets
+        if self.total_bullets_spawned >= 5:
+            self.unlock_achievement('secret_dodger')
 
     def draw_achievement_popup(self):
         # Draw achievement unlock popup in bottom left
