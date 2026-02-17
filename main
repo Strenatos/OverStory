@@ -452,6 +452,7 @@ class BulletDodgingGame:
         self.game_state = 'start_menu'
         self.shake_intensity = 0
         self.shake_duration = 0 
+        self.directions_used = set()
         
         self.canvas.delete('all')
 
@@ -2873,6 +2874,7 @@ class BulletDodgingGame:
                     self.score += 1
                     self.update_ui()
                     self.update_shake()
+                    print(self.directions_used)
 
                     particles_to_remove = []
                     for i, particle in enumerate(self.healing_particles):
