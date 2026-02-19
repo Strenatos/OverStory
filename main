@@ -55,6 +55,7 @@ class BulletDodgingGame:
         self.purchased_upgrades = []
         self.shop_page = 0
         self.enabled_upgrades = []
+        self.pause_menu_drawn = False
 
         # ==================== BOSS/FIGURE VARIABLES ====================
         self.figure_x = self.GAME_WIDTH // 2
@@ -486,7 +487,7 @@ class BulletDodgingGame:
             'default': {'name': 'Default', 'color': 'red', 'outline': 'white'},
             'skin_starter_1': {'name': 'Starter Pack 1', 'color': 'pink', 'outline': 'hotpink'},  # Pre-unlocked
             'skin_starter_2': {'name': 'Starter Pack 2', 'color': 'teal', 'outline': 'white'},  # Pre-unlocked
-            'skin_starter_3': {'name': 'Starter Pack 2', 'color': 'navy', 'outline': 'cornflowerblue'},  # Pre-unlocked
+            'skin_starter_3': {'name': 'Starter Pack 3', 'color': 'navy', 'outline': 'cornflowerblue'},  # Pre-unlocked
 
             # Regular achievement rewards (in order)
             'skin_beginner': {'name': 'Beginner', 'color': 'lightyellow', 'outline': 'khaki'}, # First Steps
@@ -534,7 +535,9 @@ class BulletDodgingGame:
             'skin_shop_3': {'name': 'Venom', 'color': 'purple', 'outline': 'limegreen'},
             'skin_shop_4': {'name': 'Inferno', 'color': 'orangered', 'outline': 'yellow'},
             'skin_shop_5': {'name': 'Abyss', 'color': 'darkslateblue', 'outline': 'mediumpurple'},
-            'skin_shop_6': {'name': 'Glacier', 'color': 'lightcyan', 'outline': 'deepskyblue'},
+            'skin_shop_6': {'name': 'Cotton Candy', 'color': 'plum', 'outline': 'violet'},
+            'skin_shop_7': {'name': 'Glacier', 'color': 'lightcyan', 'outline': 'deepskyblue'},
+            'skin_shop_8': {'name': 'Royal', 'color': 'indigo', 'outline': 'goldenrod'},
 
             # Special unlocks
             'skin_bonus': {'name': 'Bonus!', 'color': 'black', 'outline': 'orange'},  # Bonus skin from platinum
@@ -572,8 +575,11 @@ class BulletDodgingGame:
             'skin_shop_3': 2000,
             'skin_shop_4': 3500,
             'skin_shop_5': 5000,
-            'skin_shop_6': 7500,
+            'skin_shop_6': 6500,
+            'skin_shop_7': 8000 ,
+            'skin_shop_8': 10000,
         }
+
 
         self.shop_upgrades = {
         'extra_hp': {
@@ -1469,6 +1475,17 @@ class BulletDodgingGame:
         self.game_state = 'shop'
         self.canvas.delete('all')
 
+        skin_descriptions = {
+            'skin_shop_1': 'Dark as night,\nsharp as slate.',
+            'skin_shop_2': 'Cool and crisp,\nlike a winter storm.',
+            'skin_shop_3': 'Toxic and fierce,\nfear the venom.',
+            'skin_shop_4': 'Burns bright,\nnever fades.',
+            'skin_shop_5': 'Depths unknown,\ndarkness eternal.',
+            'skin_shop_6': 'Sweet and soft,\npastel perfection.',
+            'skin_shop_7': 'Cold and clear,\nsmooth as ice.',
+            'skin_shop_8': 'Fit for royalty,\nborn to rule.',
+        }
+
         self.canvas.create_text(300, 25, text="SKIN SHOP" if self.shop_page == 0 else "UPGRADES",
                             fill='gold', font=('Arial', 24, 'bold'))
         self.canvas.create_text(300, 50, text=f"🪙 {self.coins} coins",
@@ -1479,12 +1496,22 @@ class BulletDodgingGame:
                             fill='yellow', font=('Arial', 10))
 
         if self.shop_page == 0:
-            # Skins page
+            skin_descriptions = {
+                'skin_shop_1': 'Dark as night,\nsharp as slate.',
+                'skin_shop_2': 'Cool and crisp,\nlike a winter storm.',
+                'skin_shop_3': 'Toxic and fierce,\nfear the venom.',
+                'skin_shop_4': 'Burns bright,\nnever fades.',
+                'skin_shop_5': 'Depths unknown,\ndarkness eternal.',
+                'skin_shop_6': 'Sweet and soft,\npastel perfection.',
+                'skin_shop_7': 'Cold and clear,\nsmooth as ice.',
+                'skin_shop_8': 'Fit for royalty,\nborn to rule.',
+            }
+
             positions = [
-                (100, 140), (300, 140), (500, 140),
-                (100, 260), (300, 260), (500, 260),
+                (78, 140), (228, 140), (378, 140), (528, 140),
+                (78, 250), (228, 250), (378, 250), (528, 250),
             ]
-            box_width = 180
+            box_width = 140
             box_height = 100
 
             for idx, (skin_id, price) in enumerate(self.shop_skins.items()):
@@ -1497,39 +1524,64 @@ class BulletDodgingGame:
                 box_color = 'darkgreen' if purchased else 'gray20'
                 border_color = 'gold' if purchased else 'gray'
 
-                self.canvas.create_rectangle(x - box_width//2, y - box_height//2,
-                                            x + box_width//2, y + box_height//2,
-                                            fill=box_color, outline=border_color,
-                                            width=2, tags=f'shop_{skin_id}')
+                self.canvas.create_rectangle(
+                    x - box_width//2, y - box_height//2,
+                    x + box_width//2, y + box_height//2,
+                    fill=box_color, outline=border_color,
+                    width=2, tags=f'shop_{skin_id}')
 
-                self.canvas.create_oval(x - box_width//2 + 15, y - 15,
-                                    x - box_width//2 + 45, y + 15,
-                                    fill=skin['color'], outline=skin['outline'],
-                                    width=2, tags=f'shop_{skin_id}')
+                # Preview circle (left side)
+                preview_x = x - box_width//2 + 22
+                preview_y = y - 10
+                self.canvas.create_oval(
+                    preview_x - 14, preview_y - 14,
+                    preview_x + 14, preview_y + 14,
+                    fill=skin['color'], outline=skin['outline'],
+                    width=2, tags=f'shop_{skin_id}')
 
-                self.canvas.create_text(x + 10, y - 22, text=skin['name'],
-                                    fill='white', font=('Arial', 11, 'bold'),
-                                    tags=f'shop_{skin_id}')
+                # Skin name
+                self.canvas.create_text(
+                    x + 15, y - 30,
+                    text=skin['name'],
+                    fill='white', font=('Arial', 8, 'bold'),
+                    tags=f'shop_{skin_id}')
 
+                # Description
+                desc = skin_descriptions.get(skin_id, '')
+                self.canvas.create_text(
+                    x + 15, y - 10,
+                    text=desc,
+                    fill='lightgray', font=('Arial', 8),
+                    tags=f'shop_{skin_id}')
+
+                # Price / owned / buy
                 if purchased:
-                    self.canvas.create_text(x + 10, y + 5, text="OWNED",
-                                        fill='lime', font=('Arial', 10),
-                                        tags=f'shop_{skin_id}')
+                    self.canvas.create_text(
+                        x, y + 32,
+                        text="OWNED",
+                        fill='lime', font=('Arial', 9, 'bold'),
+                        tags=f'shop_{skin_id}')
                 else:
                     can_afford = self.coins >= price
                     price_color = 'yellow' if can_afford else 'red'
-                    self.canvas.create_text(x + 10, y + 5, text=f"🪙 {price} coins",
-                                        fill=price_color, font=('Arial', 10),
-                                        tags=f'shop_{skin_id}')
+                    self.canvas.create_text(
+                        x, y + 25,
+                        text=f"🪙 {price}",
+                        fill=price_color, font=('Arial', 8),
+                        tags=f'shop_{skin_id}')
                     if can_afford:
-                        self.canvas.create_rectangle(x - 35, y + 25, x + 35, y + 45,
-                                                    fill='darkgreen', outline='white',
-                                                    width=2, tags=f'buy_{skin_id}')
-                        self.canvas.create_text(x, y + 35, text="BUY",
-                                            fill='white', font=('Arial', 10, 'bold'),
-                                            tags=f'buy_{skin_id}')
-                        self.canvas.tag_bind(f'buy_{skin_id}', '<Button-1>',
-                                            lambda e, s=skin_id, p=price: self.purchase_skin(s, p))
+                        self.canvas.create_rectangle(
+                            x - 25, y + 33, x + 25, y + 45,
+                            fill='darkgreen', outline='white',
+                            width=1, tags=f'buy_{skin_id}')
+                        self.canvas.create_text(
+                            x, y + 39,
+                            text="BUY",
+                            fill='white', font=('Arial', 7, 'bold'),
+                            tags=f'buy_{skin_id}')
+                        self.canvas.tag_bind(
+                            f'buy_{skin_id}', '<Button-1>',
+                            lambda e, s=skin_id, p=price: self.purchase_skin(s, p))
 
         else:
             # Upgrades page
@@ -1674,6 +1726,7 @@ class BulletDodgingGame:
         self.game_state = 'playing'
         self.game_running = False
         self.paused = False
+        self.pause_menu_drawn = False
 
         # Reset cutscene
         self.in_cutscene = True
@@ -1951,7 +2004,11 @@ class BulletDodgingGame:
         # Press Esc or P to pause
         if event.keysym == 'Escape' or event.keysym == 'p':
             if self.game_running:
-                self.paused = not self.paused  # Toggle pause
+                if self.paused:
+                    self.resume_game()
+                else:
+                    self.paused = True
+                    self.pause_menu_drawn = False
 
     def key_release(self, event):
         self.keys_pressed.discard(event.keysym.lower())
@@ -3657,9 +3714,13 @@ class BulletDodgingGame:
         self.canvas.tag_raise('pause_resume')
         self.canvas.tag_raise('pause_restart')
         self.canvas.tag_raise('pause_quit')
+
+        for tag in ('pause', 'pause_resume', 'pause_restart', 'pause_quit'):
+            self.canvas.tag_raise(tag)
     
     def resume_game(self):
         self.paused = False
+        self.pause_menu_drawn = False
         self.canvas.delete('pause')
         self.canvas.delete('pause_resume')
         self.canvas.delete('pause_restart')
@@ -3667,10 +3728,12 @@ class BulletDodgingGame:
 
     def restart_game(self):
         self.paused = False
+        self.pause_menu_drawn = False
         self.start_game()
 
     def quit_to_menu(self, event=None):
         self.paused = False
+        self.pause_menu_drawn = False
         self.game_running = False
         self.bullets = []
         self.show_start_menu()
@@ -3724,7 +3787,9 @@ class BulletDodgingGame:
                 self.draw_everything()
 
                 if self.paused:
-                    self.draw_pause_menu()
+                    if not self.pause_menu_drawn:
+                        self.draw_pause_menu()
+                        self.pause_menu_drawn = True
 
             if self.achievement_queue or self.show_achievement_popup:
                 self.draw_achievement_popup()
