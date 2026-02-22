@@ -649,7 +649,7 @@ class BulletDodgingGame:
             },
             'noctis_rain': {
                 'name': 'Phantom Rain',
-                'description': 'Bullets that flash visible\nevery second.',
+                'description': 'Thick rain that falls down\nonto the player.',
                 'price': 50000,
                 'icon': '👻'
             },
@@ -657,7 +657,7 @@ class BulletDodgingGame:
                 'name': 'Noctis Cross', 
                 'description': 'Rotating cross beams\nthat accelerate over time.', 
                 'price': 20000,
-                'icon': '✝️'
+                'icon': 'X'
             },
             'noctis_vortex': {
                 'name': 'Dark Vortex', 
@@ -673,7 +673,7 @@ class BulletDodgingGame:
             },
             'noctis_split': {
                 'name': 'Split Shot', 
-                'description': 'Bullets that split into\nsmaller bullets on death.', 
+                'description': 'Bullets that spray\nacross the screen.', 
                 'price': 55000,
                 'icon': '🔱'
             },
@@ -2051,7 +2051,7 @@ class BulletDodgingGame:
             border_color = 'violet' if purchased else 'mediumpurple'
 
             # Taller box: y-65 to y+65 = 130px tall
-            self.canvas.create_rectangle(x - 130, y - 65, x + 130, y + 65,
+            self.canvas.create_rectangle(x - 110, y - 55, x + 110, y + 55,
                                         fill=box_color, outline=border_color, width=2,
                                         tags=f'secret_{attack_id}')
 
@@ -2104,20 +2104,20 @@ class BulletDodgingGame:
 
         # ── Page navigation ────────────────────────────────────────
         if self.secret_shop_page > 0:
-            self.canvas.create_rectangle(50, 320, 160, 345,
+            self.canvas.create_rectangle(50, 80, 160, 105,
                                         fill='darkblue', outline='white',
                                         width=2, tags='prev_secret')
-            self.canvas.create_text(105, 332, text="◄ PREV",
+            self.canvas.create_text(105, 90, text="◄ PREV",
                                 fill='white', font=('Arial', 10, 'bold'),
                                 tags='prev_secret')
             self.canvas.tag_bind('prev_secret', '<Button-1>',
                                 lambda e: self.change_secret_page(-1))
 
         if self.secret_shop_page < total_secret_pages - 1:
-            self.canvas.create_rectangle(440, 320, 550, 345,
+            self.canvas.create_rectangle(440, 80, 550, 105,
                                         fill='darkblue', outline='white',
                                         width=2, tags='next_secret')
-            self.canvas.create_text(495, 332, text="NEXT ►",
+            self.canvas.create_text(495, 90, text="NEXT ►",
                                 fill='white', font=('Arial', 10, 'bold'),
                                 tags='next_secret')
             self.canvas.tag_bind('next_secret', '<Button-1>',
@@ -4004,14 +4004,14 @@ class BulletDodgingGame:
                         })
 
     def phantom_rain_pattern(self):
-        if self.pattern_timer % 8 == 0:
+        if self.pattern_timer % 1 == 0:
             x = random.randint(self.battle_box_x + 10,
                             self.battle_box_x + self.BATTLE_BOX_WIDTH - 10)
             y = self.battle_box_y
             self.bullets.append({
                 'x': x, 'y': y,
-                'dx': random.uniform(-0.8, 0.8),
-                'dy': random.uniform(1.8, 2.8),
+                'dx': random.uniform(-1.5, 1.5),
+                'dy': random.uniform(4, 4),
                 'color': 'darkviolet',
                 'outline': 'mediumpurple',
                 'life': 300
