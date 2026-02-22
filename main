@@ -86,6 +86,7 @@ class BulletDodgingGame:
         self.secret_shop_cutscene_seen = False
         self.secret_shop_cutscene_timer = 0
         self.secret_shop_cutscene_index = 0
+        self.enabled_secret_attacks = []
 
         # ==================== PHASE/PATTERN VARIABLES ====================
         self.phase = 1
@@ -859,13 +860,24 @@ class BulletDodgingGame:
         elif self.game_state == 'secret_shop':
             if not hasattr(self, '_ss_stars') or not self._ss_stars:
                 self._ss_stars = [
-                    {'x': random.randint(0, 600), 'y': random.randint(0, 400),
-                     'r': random.uniform(1, 3), 'phase': random.uniform(0, 6.28)}
+                    {
+                        'x': random.randint(0, 600), 'y': random.randint(0, 400),
+                        'r': random.uniform(1, 3), 'phase': random.uniform(0, 6.28),
+                        'dx': random.uniform(-0.3, 0.3), 'dy': random.uniform(-0.3, 0.3),
+                    }
                     for _ in range(60)
                 ]
             t = getattr(self, '_ss_t', 0) + 1
             self._ss_t = t
             for s in self._ss_stars:
+                # Move the star
+                s['x'] += s['dx']
+                s['y'] += s['dy']
+                # Bounce off edges so they stay on screen
+                if s['x'] < 0 or s['x'] > 600:
+                    s['dx'] *= -1
+                if s['y'] < 0 or s['y'] > 400:
+                    s['dy'] *= -1
                 brightness = abs(math.sin(t * 0.04 + s['phase']))
                 shade = int(brightness * 180)
                 col = f'#{shade:02x}00{min(255, shade + 60):02x}'
@@ -1824,7 +1836,19 @@ class BulletDodgingGame:
 
                 if purchased:
                     is_enabled = upgrade_id in self.enabled_upgrades
-                    status_color = 'lime' if is_enabled else 'gray'
+                    # Box background: green = enabled, dark red = disabled
+                    if purchased:
+                        is_enabled_check = upgrade_id in self.enabled_upgrades
+                        box_color = 'darkgreen' if is_enabled_check else 'darkred'
+                        border_color = 'cyan' if is_enabled_check else 'red'
+                    else:
+                        box_color = 'gray20'
+                        border_color = 'gray'
+                    self.canvas.itemconfig(
+                        self.canvas.find_withtag(f'upgrade_{upgrade_id}')[0],
+                        fill=box_color, outline=border_color
+                    )
+                    status_color = 'lime' if is_enabled else 'salmon'
                     status_text = 'ENABLED' if is_enabled else 'DISABLED'
                     self.canvas.create_text(x, y + 15, text=status_text,
                                         fill=status_color, font=('Arial', 10, 'bold'),
@@ -1992,7 +2016,6 @@ class BulletDodgingGame:
         self.draw_secret_shop_cutscene()
 
     def show_secret_shop(self):
-        import math, random
 
         if not hasattr(self, 'secret_shop_page'):
             self.secret_shop_page = 0
@@ -2018,45 +2041,61 @@ class BulletDodgingGame:
         self.canvas.create_text(300, 95, text=f"Page {self.secret_shop_page + 1}/{total_secret_pages}",
                             fill='gray', font=('Arial', 9))
 
-        positions = [(150, 165), (450, 165), (150, 270), (450, 270)]
+        positions = [(150, 175), (450, 175), (150, 295), (450, 295)]
 
         for idx, (attack_id, attack) in enumerate(page_items):
             x, y = positions[idx]
             purchased = attack_id in self.purchased_secret_attacks
-            box_color = 'darkgreen' if purchased else 'gray20'
+            is_enabled = attack_id in getattr(self, 'enabled_secret_attacks', [])
+            box_color = "#5C2881" if purchased else 'gray20'
             border_color = 'violet' if purchased else 'mediumpurple'
 
-            self.canvas.create_rectangle(x - 130, y - 55, x + 130, y + 55,
+            # Taller box: y-65 to y+65 = 130px tall
+            self.canvas.create_rectangle(x - 130, y - 65, x + 130, y + 65,
                                         fill=box_color, outline=border_color, width=2,
                                         tags=f'secret_{attack_id}')
 
-            self.canvas.create_text(x, y - 32,
-                                text=f"{attack['icon']} {attack['name']}",
+            # Icon + name on same line at top
+            self.canvas.create_text(x, y - 42,
+                                text=f"{attack['icon']}  {attack['name']}",
                                 fill='white', font=('Arial', 12, 'bold'),
                                 tags=f'secret_{attack_id}')
 
-            self.canvas.create_text(x, y - 8,
+            # Description
+            self.canvas.create_text(x, y - 16,
                                 text=attack['description'],
                                 fill='lightgray', font=('Arial', 9),
                                 tags=f'secret_{attack_id}')
 
             if purchased:
-                self.canvas.create_text(x, y + 28,
-                                    text="UNLOCKED",
-                                    fill='lime', font=('Arial', 10, 'bold'),
+                status_text = 'ENABLED' if is_enabled else 'DISABLED'
+                status_color = 'lime' if is_enabled else 'salmon'
+                self.canvas.create_text(x, y + 12,
+                                    text=status_text,
+                                    fill=status_color, font=('Arial', 9, 'bold'),
                                     tags=f'secret_{attack_id}')
+                toggle_color = 'darkred' if is_enabled else 'darkviolet'
+                toggle_text = 'DISABLE' if is_enabled else 'ENABLE'
+                self.canvas.create_rectangle(x - 40, y + 28, x + 40, y + 50,
+                                            fill=toggle_color, outline='violet',
+                                            width=1, tags=f'toggle_secret_{attack_id}')
+                self.canvas.create_text(x, y + 39, text=toggle_text,
+                                    fill='white', font=('Arial', 9, 'bold'),
+                                    tags=f'toggle_secret_{attack_id}')
+                self.canvas.tag_bind(f'toggle_secret_{attack_id}', '<Button-1>',
+                                    lambda e, a=attack_id: self.toggle_secret_attack(a))
             else:
                 can_afford = self.coins >= attack['price']
-                self.canvas.create_text(x, y + 18,
+                self.canvas.create_text(x, y + 15,
                                     text=f"🪙 {attack['price']}",
                                     fill='yellow' if can_afford else 'red',
                                     font=('Arial', 10),
                                     tags=f'secret_{attack_id}')
                 if can_afford:
-                    self.canvas.create_rectangle(x - 30, y + 30, x + 30, y + 45,
+                    self.canvas.create_rectangle(x - 35, y + 35, x + 35, y + 55,
                                                 fill='darkviolet', outline='violet',
                                                 width=1, tags=f'buy_secret_{attack_id}')
-                    self.canvas.create_text(x, y + 37, text="BUY",
+                    self.canvas.create_text(x, y + 45, text="BUY",
                                         fill='white', font=('Arial', 8, 'bold'),
                                         tags=f'buy_secret_{attack_id}')
                     self.canvas.tag_bind(f'buy_secret_{attack_id}', '<Button-1>',
@@ -2109,6 +2148,15 @@ class BulletDodgingGame:
                             font=('Arial', 12, 'bold'), tags='back_button')
         self.canvas.tag_bind('back_button', '<Button-1>', lambda e: self.show_shop())
 
+    def toggle_secret_attack(self, attack_id):
+        if not hasattr(self, 'enabled_secret_attacks'):
+            self.enabled_secret_attacks = []
+        if attack_id in self.enabled_secret_attacks:
+            self.enabled_secret_attacks.remove(attack_id)
+        else:
+            self.enabled_secret_attacks.append(attack_id)
+        self.save_achievements()
+        self.show_secret_shop()
 
     def purchase_secret_attack(self, attack_id, price):
         if self.coins >= price and attack_id not in self.purchased_secret_attacks:
@@ -2196,7 +2244,8 @@ class BulletDodgingGame:
 
         # Secret fight specific state
         self.secret_pattern_index = 0
-        self.secret_patterns_to_run = self.purchased_secret_attacks.copy()
+        enabled = getattr(self, 'enabled_secret_attacks', [])
+        self.secret_patterns_to_run = [a for a in self.purchased_secret_attacks if a in enabled] or self.purchased_secret_attacks.copy()
         random.shuffle(self.secret_patterns_to_run)
         self.secret_fight_complete = False
         self.in_secret_victory = False
@@ -3077,6 +3126,7 @@ class BulletDodgingGame:
             'animated_bg': self.animated_bg,
             'secret_shop_cutscene_seen': self.secret_shop_cutscene_seen,
             'purchased_secret_attacks': self.purchased_secret_attacks if hasattr(self, 'purchased_secret_attacks') else [],
+            'enabled_secret_attacks': getattr(self, 'enabled_secret_attacks', []),
             'secret_shop_page': self.secret_shop_page if hasattr(self, 'secret_shop_page') else 0,
         }
 
@@ -3114,6 +3164,7 @@ class BulletDodgingGame:
         self.enabled_upgrades = []
         self.animated_bg = False
         self.purchased_secret_attacks = []
+        self.enabled_secret_attacks = []
         self.secret_shop_cutscene_seen = False
         self.secret_shop_page = 0
 
@@ -3162,6 +3213,7 @@ class BulletDodgingGame:
                 self.enabled_upgrades = save_data.get('enabled_upgrades', [])
                 self.secret_shop_cutscene_seen = save_data.get('secret_shop_cutscene_seen', False)
                 self.purchased_secret_attacks = save_data.get('purchased_secret_attacks', [])
+                self.enabled_secret_attacks = save_data.get('enabled_secret_attacks', [])
                 self.secret_shop_page = save_data.get('secret_shop_page', 0)
 
                 # Animated Background
@@ -4577,6 +4629,11 @@ class BulletDodgingGame:
                 self.draw_hint_popup()
         elif self.game_state in ('settings', 'credits', 'achievements', 'skins', 'shop', 'secret_shop'):
             self.draw_screen_background()
+            if self.game_state == 'secret_shop':
+                self.canvas.tag_lower('screen_bg')
+                for item in self.canvas.find_all():
+                    if 'screen_bg' not in self.canvas.gettags(item):
+                        self.canvas.tag_raise(item)
         elif self.game_state == 'secret_shop_cutscene':
             pass  # handled by draw_secret_shop_cutscene directly
         elif self.game_state == 'playing':
