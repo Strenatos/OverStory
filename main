@@ -394,7 +394,7 @@ class BulletDodgingGame:
             },
             'statue': {
                 'name': 'Statue',
-                'description': "Stand still for 4 seconds while not getting hit",
+                'description': 'Stand still for 4 seconds while not getting hit',
                 'unlocked': False,
                 'icon': '🪨 ',
                 'hidden': True,
@@ -516,7 +516,7 @@ class BulletDodgingGame:
             'skin_minimal': {'name': 'Minimalist', 'color': 'gray', 'outline': 'darkgray'},  # Unprotected
             'skin_developer': {'name': 'Developer', 'color': 'brown', 'outline': 'orange'},  # Hidden credits button
             'skin_comet': {'name': 'Comet', 'color': 'black', 'outline': 'cyan'},  # Bullet Dodger
-            'skin_invisible': {'name': '✨ Invisible', 'color': "#1C1C1C", 'outline': 'black', 'animated': True},  # Invisible
+            'skin_invisible': {'name': '✨ Invisible', 'color': '#1C1C1C', 'outline': 'black', 'animated': True},  # Invisible
             'skin_wallflower': {'name': 'Wallflower', 'color': 'hotpink', 'outline': 'magenta'}, # Wallflower
             'skin_statue': {'name': 'Stone', 'color': 'silver', 'outline': 'dimgray'}, # Statue
             'skin_flat': {'name': '✨ Flat', 'color': 'white', 'outline': 'white', 'animated': True}, # Wrong Direction
@@ -1064,7 +1064,7 @@ class BulletDodgingGame:
                                font=('Arial', 12), tags='credits')
         self.canvas.create_text(300, 310, text="A Bullet Dodging Adventure", fill='yellow',
                                font=('Arial', 12), tags='credits')
-        self.canvas.create_text(300, 330, text="Version 1.5", fill='gray',
+        self.canvas.create_text(300, 330, text="Version 2.2", fill='gray',
                                font=('Arial', 10), tags='credits')
 
         # Hidden developer button (small, bottom left corner)
@@ -1478,7 +1478,7 @@ class BulletDodgingGame:
         skin_descriptions = {
             'skin_shop_1': 'Dark as night,\nsharp as slate.',
             'skin_shop_2': 'Cool and crisp,\nlike a winter storm.',
-            'skin_shop_3': 'Toxic and fierce,\nfear the venom.',
+            'skin_shop_3': 'Green and purple,\na toxic good combo.',
             'skin_shop_4': 'Burns bright,\nnever fades.',
             'skin_shop_5': 'Depths unknown,\ndarkness eternal.',
             'skin_shop_6': 'Sweet and soft,\npastel perfection.',
@@ -1705,14 +1705,20 @@ class BulletDodgingGame:
                 self.unlock_achievement('all_purchased')
 
         self.show_shop()
+
     def update_fps(self):
-        self.fps_frame_count += 1
         current_time = time.time()
-        elapsed = current_time - self.last_time
-        if elapsed >= 1.0:  # update every second
-            self.fps = self.fps_frame_count
-            self.fps_frame_count = 0
-            self.last_time = current_time
+        if not hasattr(self, 'fps_times'):
+            self.fps_times = []
+        self.fps_times.append(current_time)
+
+        if len(self.fps_times) > 60:
+            self.fps_times.pop(0)
+
+        if len(self.fps_times) >= 2:
+            elapsed = self.fps_times[-1] - self.fps_times[0]
+            if elapsed > 0:
+                self.fps = (len(self.fps_times) - 1) / elapsed
 
     def start_game(self):
         import datetime
@@ -1842,8 +1848,11 @@ class BulletDodgingGame:
 
     def update_ui(self):
         self.canvas.delete('fps')
+        fps_seconds = int(self.fps)
+        fps_ms = int((self.fps - fps_seconds) * 100)  # 2 digit milliseconds
+        fps_str = f"FPS: {fps_seconds:02d}.{fps_ms:02d}"
         fps_color = 'lime' if self.fps >= 33 else 'yellow' if self.fps >= 25 else 'red'
-        self.canvas.create_text(10, 10, text=f"FPS: {self.fps}",
+        self.canvas.create_text(10, 10, text=fps_str,
                             fill=fps_color, font=('Arial', 9),
                             anchor='w', tags='fps')
         # Clear old UI
@@ -1899,7 +1908,7 @@ class BulletDodgingGame:
                                 fill='cyan', font=('Arial', 9), tags='phase_text')
             
             # Pattern timer countdown
-            frames_remaining = 120 - (self.pattern_timer % 240)
+            frames_remaining = 240 - (self.pattern_timer % 240)
             seconds = frames_remaining // 60
             milliseconds = (frames_remaining % 60) * 100 // 60  # Convert to 2 digit ms
             self.canvas.create_text(550, 57, text=f"Next: {seconds}:{milliseconds:02d}",
