@@ -87,6 +87,9 @@ class BulletDodgingGame:
         self.secret_shop_cutscene_timer = 0
         self.secret_shop_cutscene_index = 0
         self.enabled_secret_attacks = []
+        self.secret_100_earned = False
+        self.secret_100_just_earned = False
+        self.secret_100_popup_timer = 0
 
         # ==================== PHASE/PATTERN VARIABLES ====================
         self.phase = 1
@@ -557,6 +560,14 @@ class BulletDodgingGame:
 
             # Special unlocks
             'skin_bonus': {'name': 'Bonus!', 'color': 'black', 'outline': 'orange'},  # Bonus skin from platinum
+
+            # 100% secret skins - unlocked separately, not counted toward master/collector
+            'skin_noctis_angry': {'name': 'Angry NOCTIS', 'color': 'red', 'outline': 'darkred'},
+            'skin_noctis_calm': {'name': 'Calm NOCTIS', 'color': 'darkviolet', 'outl    ine': 'mediumpurple'},
+            'skin_noctis_aggressive': {'name': 'Aggressive NOCTIS', 'color': 'black', 'outline': 'crimson'},
+            'skin_noctis_pulse': {'name': '✨ Void Pulse', 'color': 'black', 'outline': 'mediumpurple', 'animated': True},
+
+            # Collector/Master skins - unlocked by getting all regular achievements or all achievements including secrets
             'skin_master': {'name': '✨ Master Collector', 'color': 'darkgoldenrod', 'outline': 'gold', 'animated': True},  # All other skins
         }
 
@@ -1287,7 +1298,7 @@ class BulletDodgingGame:
                                font=('Arial', 12), tags='credits')
         self.canvas.create_text(300, 310, text="A Bullet Dodging Adventure", fill='yellow',
                                font=('Arial', 12), tags='credits')
-        self.canvas.create_text(300, 330, text="Version 2.2", fill='gray',
+        self.canvas.create_text(300, 330, text="Version 2.5", fill='gray',
                                font=('Arial', 10), tags='credits')
 
         # Hidden developer button (small, bottom left corner)
@@ -1351,18 +1362,11 @@ class BulletDodgingGame:
 
 
     def check_master_skin(self):
-        # Check if user has unlocked all other skins to unlock Master Collector
-        # Get all skins except default and skin_master itself
-        skins_to_check = [skin_id for skin_id in self.skins.keys()
-                         if skin_id not in ['default', 'skin_master']]
-
-        all_unlocked = True
-        for skin_id in skins_to_check:
-            if not self.is_skin_unlocked(skin_id):
-                all_unlocked = False
-                break
-
-        return all_unlocked
+        # Explicitly exclude the 100% skins and skin_master itself
+        excluded = {'default', 'skin_master', 'skin_noctis_angry', 'skin_noctis_calm', 
+                    'skin_noctis_aggressive', 'skin_noctis_pulse'}
+        skins_to_check = [s for s in self.skins.keys() if s not in excluded]
+        return all(self.is_skin_unlocked(s) for s in skins_to_check)
 
     def is_skin_unlocked(self, skin_id):
         if skin_id in ['default', 'skin_starter_1', 'skin_starter_2', 'skin_starter_3']:
@@ -1402,11 +1406,24 @@ class BulletDodgingGame:
         total_pages += 1  # Add empty page 3
         
         if self.achievement_page == total_pages - 1:
-            # Empty page
             self.canvas.create_text(300, 180, text="there's nothing here!",
                                 fill='white', font=('Arial', 15, 'bold'), tags='achievements')
             self.canvas.create_text(300, 210, text="yet...",
                                 fill='gray', font=('Arial', 8), tags='achievements')
+
+            if getattr(self, 'secret_100_earned', False):
+                # Outer glow box
+                self.canvas.create_rectangle(175, 240, 425, 310,
+                                            fill='black', outline='gold',
+                                            width=3, tags='achievements')
+                # Inner shimmer line
+                self.canvas.create_rectangle(178, 243, 422, 307,
+                                            fill='', outline='darkgoldenrod',
+                                            width=1, tags='achievements')
+                self.canvas.create_text(300, 263, text="💯",
+                                    fill='gold', font=('Arial', 20), tags='achievements')
+                self.canvas.create_text(300, 288, text="100%  —  All secret attacks survived",
+                                    fill='gold', font=('Arial', 10, 'bold'), tags='achievements')
                     
         # Calculate which achievements to show on current page
         start_idx = self.achievement_page * achievements_per_page
@@ -2130,16 +2147,30 @@ class BulletDodgingGame:
         fight_label  = '⚔️ CHALLENGE NOCTIS' if have_attacks else '🔒 BUY AN ATTACK FIRST'
         fight_fg     = 'white' if have_attacks else 'gray'
 
-        self.canvas.create_rectangle(25, 355, 275, 387,
+        self.canvas.create_rectangle(25, 355, 195, 387,   # narrowed from 275
                                     fill=fight_fill, outline=fight_border,
                                     width=2, tags='fight_button')
-        self.canvas.create_text(150, 371, text=fight_label,
-                            fill=fight_fg, font=('Arial', 10, 'bold'),
+        self.canvas.create_text(110, 371, text=fight_label,    # x moved to 110
+                            fill=fight_fg, font=('Arial', 9, 'bold'),
                             tags='fight_button')
         if have_attacks:
             self.canvas.tag_bind('fight_button', '<Button-1>',
                                 lambda e: self.start_secret_fight())
 
+        # Toggle All button
+        if have_attacks:
+            all_on = all(a in self.enabled_secret_attacks for a in self.purchased_secret_attacks)
+            toggle_label = 'DISABLE ALL' if all_on else 'ENABLE ALL'
+            toggle_fill  = 'darkred' if all_on else 'darkgreen'
+            self.canvas.create_rectangle(205, 355, 315, 387,
+                                        fill=toggle_fill, outline='violet',
+                                        width=2, tags='toggle_all_btn')
+            self.canvas.create_text(260, 371, text=toggle_label,
+                                fill='white', font=('Arial', 9, 'bold'),
+                                tags='toggle_all_btn')
+            self.canvas.tag_bind('toggle_all_btn', '<Button-1>',
+                                lambda e: self.toggle_all_secret_attacks())
+            
         # ── Back button ────────────────────────────────────────────
         self.canvas.create_rectangle(325, 355, 575, 387,
                                     fill='darkgreen', outline='white',
@@ -2201,6 +2232,22 @@ class BulletDodgingGame:
                 self.unlock_achievement('all_purchased')
 
         self.show_shop()
+
+    def toggle_all_secret_attacks(self):
+        any_enabled = any(a in self.enabled_secret_attacks for a in self.purchased_secret_attacks)
+        if any_enabled:
+            # Disable all
+            self.enabled_secret_attacks = [
+                a for a in self.enabled_secret_attacks 
+                if a not in self.purchased_secret_attacks
+            ]
+        else:
+            # Enable all purchased
+            for a in self.purchased_secret_attacks:
+                if a not in self.enabled_secret_attacks:
+                    self.enabled_secret_attacks.append(a)
+        self.save_achievements()
+        self.show_secret_shop()
 
     def update_fps(self):
         current_time = time.time()
@@ -2521,7 +2568,44 @@ class BulletDodgingGame:
         elif self.game_running and not self.transitioning_to_phase2:
             self.canvas.itemconfig(self.battle_box, outline='white', width=3)
 
-        
+    def draw_secret_100_popup(self):
+        if not getattr(self, 'secret_100_just_earned', False):
+            return
+        if not hasattr(self, 'secret_100_popup_timer'):
+            self.secret_100_popup_timer = 0
+        self.secret_100_popup_timer += 1
+
+        # Fade out after 180 frames
+        if self.secret_100_popup_timer > 180:
+            self.secret_100_just_earned = False
+            self.secret_100_popup_timer = 0
+            self.canvas.delete('secret_100_popup')
+            return
+
+        self.canvas.delete('secret_100_popup')
+
+        alpha_phase = self.secret_100_popup_timer
+        pulse = abs(math.sin(alpha_phase * 0.05)) 
+        border_color = 'gold' if int(alpha_phase / 10) % 2 == 0 else 'darkgoldenrod'
+
+        # Main box
+        self.canvas.create_rectangle(170, 290, 430, 360,
+                                    fill='black', outline=border_color,
+                                    width=3, tags='secret_100_popup')
+        # Inner border
+        self.canvas.create_rectangle(173, 293, 427, 357,
+                                    fill='', outline='darkgoldenrod',
+                                    width=1, tags='secret_100_popup')
+
+        self.canvas.create_text(300, 313, text="💯  100% COMPLETE",
+                            fill='gold', font=('Arial', 13, 'bold'),
+                            tags='secret_100_popup')
+        self.canvas.create_text(300, 333, text="All secret attacks survived!",
+                            fill='white', font=('Arial', 9),
+                            tags='secret_100_popup')
+        self.canvas.create_text(300, 348, text="4 new NOCTIS skins unlocked",
+                            fill='mediumpurple', font=('Arial', 9),
+                            tags='secret_100_popup')
 
     def toggle_bg(self):
         self.animated_bg = not self.animated_bg
@@ -3088,6 +3172,17 @@ class BulletDodgingGame:
                 self.game_running = False
                 self.in_secret_victory = True
                 self.secret_victory_timer = 0
+                all_attacks = list(self.secret_attacks.keys())
+                if all(a in self.secret_patterns_to_run for a in all_attacks):
+                    self.secret_100_earned = True
+                    # Unlock all 4 NOCTIS skins
+                    for skin_id in ['skin_noctis_angry', 'skin_noctis_calm', 
+                                    'skin_noctis_aggressive', 'skin_noctis_pulse']:
+                        if skin_id not in self.purchased_skins:
+                            self.purchased_skins.append(skin_id)
+                    self.save_achievements()
+                    # Queue the notification
+                    self.secret_100_just_earned = True
                 return
 
         current = (self.secret_patterns_to_run[self.secret_pattern_index]
@@ -3128,6 +3223,8 @@ class BulletDodgingGame:
             'purchased_secret_attacks': self.purchased_secret_attacks if hasattr(self, 'purchased_secret_attacks') else [],
             'enabled_secret_attacks': getattr(self, 'enabled_secret_attacks', []),
             'secret_shop_page': self.secret_shop_page if hasattr(self, 'secret_shop_page') else 0,
+            'secret_100_earned': getattr(self, 'secret_100_earned', False),
+            'secret_100_just_earned': False,  # never persist the popup state
         }
 
         for ach_id, ach_data in self.achievements.items():
@@ -3167,6 +3264,14 @@ class BulletDodgingGame:
         self.enabled_secret_attacks = []
         self.secret_shop_cutscene_seen = False
         self.secret_shop_page = 0
+        self.secret_100_earned = False
+        self.secret_100_just_earned = False
+        self.secret_100_popup_timer = 0
+        # Remove the 4 NOCTIS skins from purchased_skins if present
+        for skin_id in ['skin_noctis_angry', 'skin_noctis_calm', 
+                        'skin_noctis_aggressive', 'skin_noctis_pulse']:
+            if skin_id in self.purchased_skins:
+                self.purchased_skins.remove(skin_id)
 
         # Save the reset state
         self.save_achievements()
@@ -3215,6 +3320,7 @@ class BulletDodgingGame:
                 self.purchased_secret_attacks = save_data.get('purchased_secret_attacks', [])
                 self.enabled_secret_attacks = save_data.get('enabled_secret_attacks', [])
                 self.secret_shop_page = save_data.get('secret_shop_page', 0)
+                self.secret_100_earned = save_data.get('secret_100_earned', False)
 
                 # Animated Background
                 self.animated_bg = save_data.get('animated_bg', False)
@@ -4424,6 +4530,22 @@ class BulletDodgingGame:
                         player_color = colors[color_index]
                         player_outline = colors[color_index]
 
+                    elif skin.get('animated') and self.current_skin == 'skin_noctis_pulse':
+                        # Pulses between deep purples and brief white flare
+                        cycle = self.pattern_timer % 60
+                        if cycle < 10:
+                            t = cycle / 10
+                            r = int(t * 255)
+                            g = 0
+                            b = int(100 + t * 155)
+                            player_color = f'#{r:02x}{g:02x}{b:02x}'
+                            player_outline = 'white'
+                        else:
+                            fade = 1 - ((cycle - 10) / 50)
+                            v = int(fade * 180)
+                            player_color = f'#{v//3:02x}00{v:02x}'
+                            player_outline = 'mediumpurple'
+
                     else:
                         player_color = skin['color']
                         player_outline = skin['outline']
@@ -4667,6 +4789,8 @@ class BulletDodgingGame:
                 if self.secret_victory_timer > 240:
                     self.in_secret_victory = False
                     self.in_secret_fight = False
+                if getattr(self, 'secret_100_just_earned', False):
+                    self.draw_secret_100_popup()
                     self.show_secret_shop()
             elif self.game_running:
                 if not self.paused:
@@ -4679,6 +4803,7 @@ class BulletDodgingGame:
                     self.update_ui()
                     self.update_shake()
                     self.score += 1
+                    print(self.secret_100_earned)
 
                     particles_to_remove = []
                     for i, particle in enumerate(self.healing_particles):
